@@ -1,0 +1,810 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+input AssignWorkRuleInput {
+  assigneeId: String!
+  assigneeType: WorkRuleAssigneeType!
+  effectiveFrom: String
+  effectiveTo: String
+  priority: Int
+  workRuleId: String!
+}
+
+enum AuditActorType {
+  AI_AGENT
+  SYSTEM
+  USER
+}
+
+type AuditLogEntry {
+  action: String!
+  actorId: String
+  actorType: AuditActorType!
+  afterState: JSON
+  beforeState: JSON
+  createdAt: DateTime!
+  id: ID!
+  resourceId: String
+  resourceType: String!
+}
+
+input CreateEmployeeDataSourceInput {
+  agentId: String
+  dataSource: String!
+  employeeId: String!
+  extension: String
+}
+
+input CreateEmployeeGroupInput {
+  description: String
+  name: String!
+  organizationId: String
+  parentGroupId: String
+  status: EmployeeGroupStatus
+}
+
+input CreateEmployeeInput {
+  birthDate: String
+  cellPhone: String
+  contractHoursPerWeek: Float!
+  costCenter: String
+  desktopMessagingUsername: String
+  email: String
+  employeeNumber: String!
+  employmentType: EmploymentType!
+  hireDate: String!
+  homeAddress: HomeAddressInput
+  homePhone: String
+  isSupervisor: Boolean
+  isTeamLead: Boolean
+  jobTitle: String
+  managerEmployeeId: String
+  middleInitial: String
+  orgUnitId: String!
+  rank: Int
+  suffix: String
+  taxId: String
+  teamLeadEmployeeId: String
+  userId: String
+  wageAmount: Float
+  workPhone: String
+}
+
+input CreateEmployeeInteractionInput {
+  body: String!
+  employeeId: String!
+  interactionType: InteractionType!
+}
+
+input CreateEmploymentPolicyInput {
+  definition: JSON!
+  effectiveFrom: String!
+  jurisdiction: String
+  orgUnitId: String
+  policyGroupId: String
+  policyType: EmploymentPolicyType!
+}
+
+input CreateErasureRequestInput {
+  legalBasis: String!
+}
+
+input CreateOrgUnitInput {
+  countryCode: String!
+  name: String!
+  parentOrgUnitId: String
+  timezone: String!
+  type: OrgUnitType!
+}
+
+input CreateSkillInput {
+  category: String!
+  certificationValidityDays: Int
+  description: String
+  name: String!
+  requiresCertification: Boolean! = false
+  status: SkillStatus
+}
+
+input CreateWorkRuleInput {
+  description: String
+  effectiveFrom: String
+  effectiveTo: String
+  maxConsecutiveDays: Int
+  maxOtPerDay: Float
+  maxOtPerWeek: Float
+  maxVtoPerDay: Float
+  maxVtoPerWeek: Float
+  maxWeeklyHours: Float
+  minPaidHours: Float
+  minRestHours: Float
+  name: String!
+  otEligible: Boolean = true
+  requiredPayPeriodHours: Float
+}
+
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
+
+enum EarlyLate {
+  EARLY
+  LATE
+}
+
+type Employee {
+  avatarUrl: String
+  birthDate: String
+  cellPhone: String
+  contractHoursPerWeek: Float!
+  costCenter: String
+  dataSources: [EmployeeDataSource!]!
+  desktopMessagingUsername: String
+  directReports: [Employee!]!
+  effectiveWorkRule: WorkRule
+  email: String
+  employeeNumber: String!
+  employmentType: EmploymentType!
+  groups: [EmployeeGroup!]!
+  hireDate: String!
+  homeAddress: HomeAddress
+  homePhone: String
+  id: ID!
+  interactions: [EmployeeInteraction!]!
+  isSupervisor: Boolean!
+  isTeamLead: Boolean!
+  jobTitle: String
+  manager: Employee
+  managerEmployeeId: String
+  middleInitial: String
+  orgUnit: OrgUnit!
+  orgUnitId: String
+  rank: Int
+  schedulePreference: EmployeeSchedulePreference
+  skills: [EmployeeSkill!]!
+  status: EmployeeStatus!
+  suffix: String
+  taxIdLastFour: String
+  teamLead: Employee
+  teamLeadEmployeeId: String
+  terminationDate: String
+  userId: String
+  wageAmount: Float
+  workPhone: String
+  workRules: [WorkRule!]!
+}
+
+type EmployeeDataSource {
+  agentId: String
+  dataSource: String!
+  employeeId: ID!
+  extension: String
+  id: ID!
+  updatedAt: DateTime!
+}
+
+input EmployeeFilterInput {
+  employmentType: EmploymentType
+  orgUnitId: String
+  status: EmployeeStatus
+}
+
+type EmployeeGroup {
+  createdAt: DateTime!
+  description: String
+  id: ID!
+  memberEmployeeIds: [ID!]!
+  name: String!
+  organizationId: ID
+  parentGroupId: ID
+  status: EmployeeGroupStatus!
+  updatedAt: DateTime!
+}
+
+input EmployeeGroupFilterInput {
+  organizationId: String
+  parentGroupId: String
+  rootOnly: Boolean
+  status: EmployeeGroupStatus
+}
+
+enum EmployeeGroupStatus {
+  ACTIVE
+  DISABLED
+}
+
+type EmployeeHistoryEntry {
+  contractHoursPerWeek: String!
+  costCenter: String
+  employeeNumber: String!
+  employmentType: EmploymentType!
+  id: ID!
+  managerEmployeeId: String
+  orgUnitId: String!
+  status: EmployeeStatus!
+  validFrom: DateTime!
+  validTo: DateTime
+}
+
+type EmployeeInteraction {
+  body: String!
+  createdAt: DateTime!
+  createdBy: String
+  employeeId: ID!
+  id: ID!
+  interactionType: InteractionType!
+}
+
+type EmployeeSchedulePreference {
+  employeeId: ID!
+  maxWeeklyHours: Float
+  notes: String
+  preferenceSlots: [SchedulePreferenceSlot!]
+  preferredDaysOff: [Weekday!]
+  preferredShiftEnd: String
+  preferredShiftStart: String
+  updatedAt: DateTime!
+  updatedBy: String
+}
+
+type EmployeeSkill {
+  certifiedDate: String
+  decayScore: Float!
+  employeeId: String!
+  expiryDate: String
+  lastScheduledOnSkillAt: DateTime
+  proficiencyLevel: ProficiencyLevel!
+  skill: Skill!
+  skillId: String!
+}
+
+input EmployeeSkillAssignmentInput {
+  certifiedDate: String
+  proficiencyLevel: ProficiencyLevel!
+  skillId: String!
+}
+
+type EmployeeSkillHistoryEntry {
+  certifiedDate: String
+  expiryDate: String
+  id: ID!
+  proficiencyLevel: ProficiencyLevel!
+  validFrom: DateTime!
+  validTo: DateTime
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  ON_LEAVE
+  PENDING_ONBOARDING
+  TERMINATED
+}
+
+type EmploymentPolicy {
+  definition: JSON!
+  effectiveFrom: DateTime!
+  effectiveTo: DateTime
+  id: ID!
+  orgUnitId: String
+  policyGroupId: ID!
+  policyType: EmploymentPolicyType!
+  version: Int!
+}
+
+enum EmploymentPolicyType {
+  MAX_CONSECUTIVE_DAYS
+  OVERTIME_THRESHOLD
+  REST_PERIOD_MINIMUM
+  UNION_RULE
+}
+
+enum EmploymentType {
+  CONTRACTOR
+  FULL_TIME
+  PART_TIME
+  SEASONAL
+}
+
+type ErasureRequest {
+  completedAt: DateTime
+  employeeId: ID!
+  id: ID!
+  legalBasis: String!
+  requestedAt: DateTime!
+  requestedBy: ID!
+  status: ErasureRequestStatus!
+}
+
+enum ErasureRequestStatus {
+  APPROVED
+  COMPLETED
+  PENDING
+  REJECTED
+}
+
+type FeatureFlag {
+  enabled: Boolean!
+  flagKey: String!
+}
+
+type HomeAddress {
+  city: String
+  country: String
+  postalCode: String
+  region: String
+  street1: String
+  street2: String
+}
+
+input HomeAddressInput {
+  city: String
+  country: String
+  postalCode: String
+  region: String
+  street1: String
+  street2: String
+}
+
+enum InteractionType {
+  COACHING
+  DISCIPLINARY
+  GENERAL_NOTE
+  ONE_ON_ONE
+  RECOGNITION
+}
+
+"""
+Arbitrary JSON value (object, array, string, number, boolean, or null).
+"""
+scalar JSON
+
+type Mutation {
+  addEmployeeDataSource(input: CreateEmployeeDataSourceInput!): EmployeeDataSource!
+  addEmployeeToGroup(employeeId: ID!, groupId: ID!): EmployeeGroup!
+  addTimeBankEntry(employeeId: ID!, entryDate: String!, hours: Float!, reason: String!): TimeBankEntry!
+  approveErasureRequest(id: ID!): ErasureRequest!
+  assignWorkRule(input: AssignWorkRuleInput!): WorkRule!
+  completeErasureRequest(id: ID!): ErasureRequest!
+  createEmployee(input: CreateEmployeeInput!): Employee!
+  createEmployeeGroup(input: CreateEmployeeGroupInput!): EmployeeGroup!
+  createEmployeeInteraction(input: CreateEmployeeInteractionInput!): EmployeeInteraction!
+  createEmploymentPolicy(input: CreateEmploymentPolicyInput!): EmploymentPolicy!
+  createErasureRequest(employeeId: ID!, input: CreateErasureRequestInput!): ErasureRequest!
+  createOrgUnit(input: CreateOrgUnitInput!): OrgUnit!
+  createSkill(input: CreateSkillInput!): Skill!
+  createWorkRule(input: CreateWorkRuleInput!): WorkRule!
+  deleteEmployeeGroup(id: ID!): Boolean!
+  deleteEmployeeInteraction(id: ID!): Boolean!
+  deleteWorkRule(id: ID!): Boolean!
+  rejectErasureRequest(id: ID!): ErasureRequest!
+  removeEmployeeDataSource(id: ID!): Boolean!
+  removeEmployeeFromGroup(employeeId: ID!, groupId: ID!): EmployeeGroup!
+  setFeatureFlag(enabled: Boolean!, flagKey: String!): FeatureFlag!
+  transferEmployee(effectiveDate: String, employeeId: ID!, newManagerEmployeeId: ID, newOrgUnitId: ID!): Employee!
+  unassignWorkRule(input: AssignWorkRuleInput!): WorkRule!
+  updateEmployee(id: ID!, input: UpdateEmployeeInput!): Employee!
+  updateEmployeeDataSource(input: UpdateEmployeeDataSourceInput!): EmployeeDataSource!
+  updateEmployeeGroup(input: UpdateEmployeeGroupInput!): EmployeeGroup!
+  updateEmployeeInteraction(body: String!, id: ID!): EmployeeInteraction!
+  updateEmployeeSkills(input: UpdateEmployeeSkillsInput!): [EmployeeSkill!]!
+  updateOrgUnit(id: ID!, input: UpdateOrgUnitInput!): OrgUnit!
+  updateSkill(input: UpdateSkillInput!): Skill!
+  updateWorkRule(input: UpdateWorkRuleInput!): WorkRule!
+  upsertEmployeeSchedulePreference(input: UpsertEmployeeSchedulePreferenceInput!): EmployeeSchedulePreference!
+  upsertOrgUnitInteractionSettings(input: UpsertOrgUnitInteractionSettingsInput!): OrgUnitInteractionSettings!
+}
+
+type OrgUnit {
+  children: [OrgUnit!]!
+  countryCode: String!
+  employees: [Employee!]!
+  id: ID!
+  name: String!
+  parent: OrgUnit
+  parentOrgUnitId: String
+  status: OrgUnitStatus!
+  timezone: String!
+  type: OrgUnitType!
+}
+
+type OrgUnitInteractionSettings {
+  audioRecordingPercentage: Float
+  conditionalCustomDataJson: String
+  inboxUrl: String
+  inheritFromParent: Boolean!
+  isConfigured: Boolean!
+  orgUnitId: ID!
+  resolvedFromOrgUnitId: ID
+  screenRecordingPercentage: Float
+  systemDefined: Boolean!
+  updatedAt: String
+  videoRecordingPercentage: Float
+}
+
+type OrgUnitScope {
+  isTenantWide: Boolean!
+  orgUnits: [OrgUnit!]!
+}
+
+type OrgUnitSnapshot {
+  children: [OrgUnitSnapshot!]!
+  countryCode: String!
+  id: ID!
+  name: String!
+  parentOrgUnitId: String
+  status: OrgUnitStatus!
+  timezone: String!
+  type: OrgUnitType!
+}
+
+enum OrgUnitStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum OrgUnitType {
+  BUSINESS_UNIT
+  DEPARTMENT
+  SITE
+  TEAM
+}
+
+input PaginationInput {
+  limit: Int = 50
+  offset: Int = 0
+}
+
+type Permission {
+  action: PermissionAction!
+  id: ID!
+  resource: String!
+}
+
+enum PermissionAction {
+  APPROVE
+  DELETE
+  READ
+  WRITE
+}
+
+type Policy {
+  definition: JSON!
+  effectiveFrom: DateTime!
+  effectiveTo: DateTime
+  id: ID!
+  orgUnitId: String
+  policyGroupId: ID!
+  policyType: PolicyType!
+  version: Int!
+}
+
+enum PolicyType {
+  ACCESS_RESTRICTION_POLICY
+  APPROVAL_CHAIN
+  AUTH_METHOD_POLICY
+  BREAK_RULE
+  DATA_RETENTION
+  GEOFENCE_BOUNDARY
+  MAINTENANCE_MODE
+  MAX_CONSECUTIVE_DAYS
+  OVERTIME_RULE
+  OVERTIME_THRESHOLD
+  RATE_LIMIT
+  REST_PERIOD_MINIMUM
+  SKILL_DECAY_HALF_LIFE
+  SYSTEM_LIMITS
+  UNION_RULE
+}
+
+enum ProficiencyLevel {
+  EXPERT
+  PROFICIENT
+  TRAINEE
+}
+
+type Query {
+  auditLog(actorType: AuditActorType, before: DateTime, limit: Int, resourceId: String, resourceType: String): [AuditLogEntry!]!
+  employee(id: ID!): Employee!
+  employeeGroup(id: ID!): EmployeeGroup!
+  employeeGroups(filter: EmployeeGroupFilterInput): [EmployeeGroup!]!
+  employeeHistory(employeeId: ID!): [EmployeeHistoryEntry!]!
+  employeeInteractions(employeeId: ID!): [EmployeeInteraction!]!
+  employeeSchedulePreference(employeeId: ID!): EmployeeSchedulePreference
+  employeeSkillHistory(employeeId: ID!, skillId: ID!): [EmployeeSkillHistoryEntry!]!
+  employees(filter: EmployeeFilterInput, pagination: PaginationInput): [Employee!]!
+  employeesCount(filter: EmployeeFilterInput): Float!
+  employmentPolicies(orgUnitId: ID): [EmploymentPolicy!]!
+  employmentPolicy(asOf: DateTime, policyGroupId: ID!): EmploymentPolicy!
+  erasureRequest(id: ID!): ErasureRequest!
+  erasureRequestsForEmployee(employeeId: ID!): [ErasureRequest!]!
+  featureFlag(flagKey: String!): FeatureFlag!
+  me: User!
+  myTenant: Tenant!
+  orgHierarchy(asOfDate: DateTime, rootId: ID!): OrgUnitSnapshot!
+  orgUnit(id: ID!): OrgUnit!
+  orgUnitInteractionSettings(orgUnitId: ID!): OrgUnitInteractionSettings!
+  orgUnitRoots: [OrgUnit!]!
+  permissions: [Permission!]!
+  policies(policyType: PolicyType): [Policy!]!
+  policy(id: ID!): Policy!
+  policyHistory(policyGroupId: ID!): [Policy!]!
+  role(id: ID!): Role!
+  roles: [Role!]!
+  skill(id: ID!): Skill!
+  skills: [Skill!]!
+  skillsExpiringSoon(limit: Int, offset: Int, withinDays: Int!): [EmployeeSkill!]!
+  tenant(id: ID!): Tenant!
+  tenantChildren(parentTenantId: ID): [Tenant!]!
+  timeBankBalance(employeeId: ID!): Float!
+  timeBankEntries(employeeId: ID!): [TimeBankEntry!]!
+  user(id: ID!): User!
+  users: [User!]!
+  workRule(id: ID!): WorkRule!
+  workRules: [WorkRule!]!
+  workingTimeCalendar(orgUnitId: ID): WorkingTimeCalendar
+  workingTimeCalendarHistory(calendarId: ID!): [WorkingTimeCalendarHistoryEntry!]!
+}
+
+type Role {
+  id: ID!
+  isSystemRole: Boolean!
+  name: String!
+  permissions: [Permission!]!
+  tenantId: String
+}
+
+type SchedulePreferenceSlot {
+  earlyLate: EarlyLate
+  endTime: String
+  rank: Int!
+  startTime: String
+}
+
+input SchedulePreferenceSlotInput {
+  earlyLate: EarlyLate
+  endTime: String
+  rank: Int!
+  startTime: String
+}
+
+type Skill {
+  category: String!
+  certificationValidityDays: Int
+  description: String
+  id: ID!
+  name: String!
+  requiresCertification: Boolean!
+  status: SkillStatus!
+}
+
+enum SkillStatus {
+  ACTIVE
+  DISABLED
+}
+
+type Tenant {
+  dataResidencyRegion: String!
+  id: ID!
+  name: String!
+  parentTenantId: String
+  status: TenantStatus!
+  tier: TenantTier!
+}
+
+enum TenantStatus {
+  ACTIVE
+  DEPROVISIONED
+  PROVISIONING
+  SUSPENDED
+}
+
+enum TenantTier {
+  BPO
+  ENTERPRISE
+  SMB
+}
+
+type TimeBankEntry {
+  createdAt: DateTime!
+  createdBy: ID
+  employeeId: ID!
+  entryDate: String!
+  hours: Float!
+  id: ID!
+  reason: String!
+}
+
+input UpdateEmployeeDataSourceInput {
+  agentId: String
+  extension: String
+  id: String!
+}
+
+input UpdateEmployeeGroupInput {
+  description: String
+  id: String!
+  name: String
+  organizationId: String
+  parentGroupId: String
+  status: EmployeeGroupStatus
+}
+
+input UpdateEmployeeInput {
+  birthDate: String
+  cellPhone: String
+  contractHoursPerWeek: Float
+  costCenter: String
+  desktopMessagingUsername: String
+  effectiveDate: String
+  email: String
+  employmentType: EmploymentType
+  homeAddress: HomeAddressInput
+  homePhone: String
+  isSupervisor: Boolean
+  isTeamLead: Boolean
+  jobTitle: String
+  middleInitial: String
+  rank: Int
+  status: EmployeeStatus
+  suffix: String
+  taxId: String
+  teamLeadEmployeeId: String
+  terminationDate: String
+  userId: String
+  wageAmount: Float
+  workPhone: String
+}
+
+input UpdateEmployeeSkillsInput {
+  employeeId: String!
+  skills: [EmployeeSkillAssignmentInput!]!
+}
+
+input UpdateOrgUnitInput {
+  countryCode: String
+  effectiveDate: String
+  name: String
+  parentOrgUnitId: String
+  status: OrgUnitStatus
+  timezone: String
+}
+
+input UpdateSkillInput {
+  category: String
+  certificationValidityDays: Int
+  description: String
+  id: ID!
+  name: String
+  requiresCertification: Boolean
+  status: SkillStatus
+}
+
+input UpdateWorkRuleInput {
+  description: String
+  effectiveFrom: String
+  effectiveTo: String
+  id: String!
+  maxConsecutiveDays: Int
+  maxOtPerDay: Float
+  maxOtPerWeek: Float
+  maxVtoPerDay: Float
+  maxVtoPerWeek: Float
+  maxWeeklyHours: Float
+  minPaidHours: Float
+  minRestHours: Float
+  name: String
+  otEligible: Boolean
+  requiredPayPeriodHours: Float
+}
+
+input UpsertEmployeeSchedulePreferenceInput {
+  employeeId: String!
+  maxWeeklyHours: Float
+  notes: String
+  preferenceSlots: [SchedulePreferenceSlotInput!]
+  preferredDaysOff: [Weekday!]
+  preferredShiftEnd: String
+  preferredShiftStart: String
+}
+
+input UpsertOrgUnitInteractionSettingsInput {
+  audioRecordingPercentage: Float
+
+  """
+  JSON-encoded object — arbitrary shape, no fixed schema exists for "conditional custom data" anywhere in this platform.
+  """
+  conditionalCustomDataJson: String
+  inboxUrl: String
+  inheritFromParent: Boolean
+  orgUnitId: String!
+  screenRecordingPercentage: Float
+  systemDefined: Boolean
+  videoRecordingPercentage: Float
+}
+
+type User {
+  email: String!
+  employee: Employee
+  familyName: String
+  givenName: String
+  id: ID!
+  mfaEnabled: Boolean!
+  orgUnitScope: OrgUnitScope!
+  roles: [Role!]!
+  status: UserStatus!
+  username: String
+}
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+  INVITED
+}
+
+enum Weekday {
+  FRIDAY
+  MONDAY
+  SATURDAY
+  SUNDAY
+  THURSDAY
+  TUESDAY
+  WEDNESDAY
+}
+
+type WorkRule {
+  assignments: [WorkRuleAssignment!]!
+  createdAt: DateTime!
+  description: String
+  effectiveFrom: String
+  effectiveTo: String
+  id: ID!
+  maxConsecutiveDays: Int
+  maxOtPerDay: Float
+  maxOtPerWeek: Float
+  maxVtoPerDay: Float
+  maxVtoPerWeek: Float
+  maxWeeklyHours: Float
+  minPaidHours: Float
+  minRestHours: Float
+  name: String!
+  otEligible: Boolean!
+  requiredPayPeriodHours: Float
+  updatedAt: DateTime!
+}
+
+enum WorkRuleAssigneeType {
+  EMPLOYEE
+  GROUP
+}
+
+type WorkRuleAssignment {
+  assignedAt: DateTime!
+  assigneeId: ID!
+  assigneeType: WorkRuleAssigneeType!
+  effectiveFrom: String
+  effectiveTo: String
+  priority: Int!
+  workRuleId: ID!
+}
+
+type WorkingTimeCalendar {
+  countryCode: String!
+  holidayDates: [String!]!
+  id: ID!
+  orgUnitId: String
+  standardBusinessHours: JSON!
+  timezone: String!
+}
+
+type WorkingTimeCalendarHistoryEntry {
+  countryCode: String!
+  holidayDates: [String!]!
+  id: ID!
+  orgUnitId: String
+  standardBusinessHours: JSON!
+  timezone: String!
+  validFrom: DateTime!
+  validTo: DateTime
+}

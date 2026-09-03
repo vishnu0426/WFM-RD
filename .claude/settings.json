@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(D/WFM-2/src/database/migrations/)",
+      "Bash(D/WFM-2/scripts/init-roles.sql)"
+    ]
+  }
+}

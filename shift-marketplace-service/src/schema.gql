@@ -1,0 +1,137 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+type ApproveMarketplaceActionResult {
+  claim: MarketplaceClaim
+  swap: SwapRequest
+}
+
+type Bid {
+  bidOpportunityId: ID!
+  employeeId: ID!
+  id: ID!
+  rankExplanation: JSON
+  rankPosition: Float
+  rankScore: Float
+  submittedAt: DateTime!
+}
+
+type BidOpportunity {
+  biddingWindowEnd: DateTime!
+  biddingWindowStart: DateTime!
+  id: ID!
+  marketplacePostId: ID!
+  rankingMethod: String!
+}
+
+type ClaimOpenShiftResult {
+  claim: MarketplaceClaim!
+  post: MarketplacePost!
+}
+
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
+
+"""
+Arbitrary JSON value (object, array, string, number, boolean, or null).
+"""
+scalar JSON
+
+type MarketplaceClaim {
+  claimantEmployeeId: ID!
+  claimedAt: DateTime!
+  decisionReason: String
+  id: ID!
+  source: String!
+  status: String!
+  validationResult: JSON
+}
+
+type MarketplaceEngagementEvent {
+  badgesAwarded: [String!]!
+  createdAt: DateTime!
+  eventType: String!
+  id: ID!
+  pointsDelta: Float!
+  referenceId: ID!
+  streakDaysAfter: Float!
+}
+
+type MarketplaceEngagementScore {
+  badges: [String!]!
+  employeeId: ID!
+  lastEngagementDate: String
+  points: Float!
+  streakDays: Float!
+}
+
+type MarketplaceHealthSnapshot {
+  claimAttemptsByResult: [MarketplaceMetricCount!]!
+  guardrailValidationByResult: [MarketplaceMetricCount!]!
+  lockContentionTotal: Float!
+}
+
+type MarketplaceMetricCount {
+  count: Float!
+  label: String!
+}
+
+type MarketplacePost {
+  bidOpportunityId: ID
+  eligibleForMe: Boolean!
+  expiresAt: DateTime!
+  id: ID!
+  orgUnitId: ID!
+  postType: String!
+  shiftAssignmentId: ID!
+  status: String!
+}
+
+type Mutation {
+  approveMarketplaceAction(claimId: ID, swapRequestId: ID): ApproveMarketplaceActionResult!
+  claimOpenShift(postId: ID!): ClaimOpenShiftResult!
+  proposeSwap(initiatorOrgUnitId: ID!, initiatorShiftId: ID!, targetEmployeeId: ID, targetOrgUnitId: ID, targetShiftId: ID): SwapRequest!
+  rejectMarketplaceAction(claimId: ID, reason: String!, swapRequestId: ID): ApproveMarketplaceActionResult!
+  respondToSwap(accept: Boolean!, offeredOrgUnitId: ID, offeredShiftId: ID, swapRequestId: ID!): SwapRequest!
+  submitBid(bidOpportunityId: ID!, preferenceScore: Float): Bid!
+}
+
+type PendingMarketplaceAction {
+  claim: MarketplaceClaim
+  claimPost: MarketplacePost
+  swap: SwapRequest
+}
+
+type Query {
+  bid(id: ID!): Bid
+  bidOpportunity(id: ID!): BidOpportunity
+  bids(bidOpportunityId: ID!): [Bid!]!
+  marketplaceAutoApprovalEnabled: Boolean!
+  marketplaceHealthSnapshot: MarketplaceHealthSnapshot!
+  marketplacePost(id: ID!): MarketplacePost
+  marketplacePosts(orgUnitId: ID!, status: String): [MarketplacePost!]!
+  myMarketplaceEngagement: MarketplaceEngagementScore
+  myMarketplaceEngagementEvents: [MarketplaceEngagementEvent!]!
+  pendingMarketplaceActions(orgUnitId: ID!): [PendingMarketplaceAction!]!
+  swapRequest(id: ID!): SwapRequest
+}
+
+type Subscription {
+  marketplacePostUpdated(orgUnitId: ID!, tenantId: ID!): MarketplacePost!
+}
+
+type SwapRequest {
+  createdAt: DateTime!
+  decisionReason: String
+  id: ID!
+  initiatorEmployeeId: ID!
+  initiatorShiftId: ID!
+  requiresSupervisorApproval: Boolean!
+  status: String!
+  targetEmployeeId: ID
+  targetShiftId: ID
+  validationResult: JSON
+}

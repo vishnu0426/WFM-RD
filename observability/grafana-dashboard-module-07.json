@@ -1,0 +1,194 @@
+{
+  "title": "AGNO WFM — Module 07 Shift Marketplace (Phase 8 SLO Dashboard)",
+  "uid": "agno-wfm-module-07",
+  "schemaVersion": 39,
+  "timezone": "browser",
+  "time": { "from": "now-1h", "to": "now" },
+  "refresh": "30s",
+  "tags": ["agno-wfm", "module-07", "shift-marketplace"],
+  "panels": [
+    {
+      "type": "row",
+      "title": "SLO — Claim lock acquisition (§0.5: p99 < 100ms, ADR-0085)",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100
+    },
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "marketplace_claim_lock_acquisition_duration_seconds — p50/p95/p99 vs 100ms target",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "fieldConfig": {
+        "defaults": { "unit": "s", "custom": { "drawStyle": "line" } },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(marketplace_claim_lock_acquisition_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(marketplace_claim_lock_acquisition_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(marketplace_claim_lock_acquisition_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p99"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Claim attempts by outcome (marketplace_claim_attempts_total) — result=rate_limited is the §5.2 abuse signal",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+      "fieldConfig": {
+        "defaults": { "unit": "reqps" },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(marketplace_claim_attempts_total[5m])) by (result)",
+          "legendFormat": "{{result}}"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "SLO — Guardrail validation gRPC round-trip to Module 04 (§0.5: p99 < 500ms, ADR-0082/0086)",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 },
+      "id": 101
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "marketplace_guardrail_validation_duration_seconds — p50/p95/p99 vs 500ms target",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 10 },
+      "fieldConfig": {
+        "defaults": { "unit": "s", "custom": { "drawStyle": "line" } },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(marketplace_guardrail_validation_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(marketplace_guardrail_validation_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(marketplace_guardrail_validation_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p99"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "HTTP request duration — p99 by route",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 10 },
+      "fieldConfig": {
+        "defaults": { "unit": "s", "custom": { "drawStyle": "line" } },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, route))",
+          "legendFormat": "{{route}}"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "SLO — marketplacePostUpdated subscription push (§0.5: p99 < 500ms)",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 18 },
+      "id": 102
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "marketplace_subscription_push_duration_seconds — p50/p95/p99 vs 500ms target",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 19 },
+      "fieldConfig": {
+        "defaults": { "unit": "s", "custom": { "drawStyle": "line" } },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(marketplace_subscription_push_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(marketplace_subscription_push_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(marketplace_subscription_push_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p99"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "text",
+      "title": "No continuous metric for real client-received push latency",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 19 },
+      "options": {
+        "mode": "markdown",
+        "content": "`marketplace_subscription_push_duration_seconds` measures only the in-process `pubSub.publish()` call - not the full NATS/WebSocket round-trip to a real subscribed client. That fuller measurement is validated periodically via `scripts/load-test.ts` (Phase 8) instead - see `docs/module-07-phase-8-load-test-results.md` for the last real measurement (p99 127.5ms at 25-round scale, well under the 500ms target). Same scope boundary Module 05's own dashboard documents for its analogous push metric (ADR-0071/0072)."
+      }
+    },
+    {
+      "type": "row",
+      "title": "Process & platform health",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 27 },
+      "id": 103
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Process resident memory",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+      "fieldConfig": {
+        "defaults": { "unit": "bytes" },
+        "overrides": []
+      },
+      "targets": [
+        { "expr": "process_resident_memory_bytes{job=\"agno-wfm-shift-marketplace-service\"}", "legendFormat": "RSS" }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Node.js event loop lag (p99)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
+      "fieldConfig": {
+        "defaults": { "unit": "s" },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "nodejs_eventloop_lag_p99_seconds{job=\"agno-wfm-shift-marketplace-service\"}",
+          "legendFormat": "p99 lag"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Known observability gaps",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 36 },
+      "id": 104
+    },
+    {
+      "id": 9,
+      "type": "text",
+      "title": "No metric on the NATS handoff to Module 04",
+      "gridPos": { "h": 4, "w": 24, "x": 0, "y": 37 },
+      "options": {
+        "mode": "markdown",
+        "content": "`MarketplaceEventPublisherService.publishClaimApproved`/`publishSwapExecuted` (the actual Module 04 handoff, ADR-0089) has no Prometheus metric for publish latency or success/failure rate - a failed publish is only visible via this service's own logs (`logger.warn`), not `/metrics` or an alert. A real, accepted gap (docs/module-07-phase-8-production-readiness-checklist.md), not fixed this phase - see the checklist for why it was deprioritized relative to the SLOs this dashboard's other panels cover."
+      }
+    }
+  ]
+}

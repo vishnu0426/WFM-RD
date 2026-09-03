@@ -1,0 +1,189 @@
+{
+  "title": "AGNO WFM — Module 06 Attendance & Leave (Phase 8 Dashboard)",
+  "uid": "agno-wfm-module06",
+  "schemaVersion": 39,
+  "timezone": "browser",
+  "time": { "from": "now-24h", "to": "now" },
+  "refresh": "30s",
+  "tags": ["agno-wfm", "module-06"],
+  "panels": [
+    { "type": "row", "title": "SLO — leave-approval → Module 04 visibility (§0.5: p99 < 2s, push-path slice only)", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }, "id": 100 },
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "attendance_leave_approval_propagation_duration_seconds — p50/p95/p99 vs 2s target",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum(rate(attendance_leave_approval_propagation_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p50" },
+        { "expr": "histogram_quantile(0.95, sum(rate(attendance_leave_approval_propagation_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95" },
+        { "expr": "histogram_quantile(0.99, sum(rate(attendance_leave_approval_propagation_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p99" }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "text",
+      "title": "Only the push-path slice is measured here",
+      "gridPos": { "h": 3, "w": 24, "x": 0, "y": 9 },
+      "options": {
+        "mode": "markdown",
+        "content": "This histogram covers only `decideLeaveRequest` approval → NATS publish resolving (this service's own slice). scheduling-service's own pull-path/solve-trigger latency is not instrumented anywhere - see ADR-0078's consequences section and the Phase 5 production readiness checklist."
+      }
+    },
+    { "type": "row", "title": "Attendance ingestion (Phase 2)", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 12 }, "id": 101 },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "attendance_ingestion_events_total by result",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 13 },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [{ "expr": "sum(rate(attendance_ingestion_events_total[5m])) by (result)", "legendFormat": "{{result}}" }]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "attendance_ledger_insert_duration_seconds — p99 (idempotency-ledger INSERT, incl. dedup path)",
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 13 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [{ "expr": "histogram_quantile(0.99, sum(rate(attendance_ledger_insert_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p99" }]
+    },
+    { "type": "row", "title": "Leave request lifecycle (Phase 3/4)", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 20 }, "id": 102 },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "leave_request_submissions_total by result",
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 21 },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [{ "expr": "sum(rate(leave_request_submissions_total[5m])) by (result)", "legendFormat": "{{result}}" }]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "leave_request_decisions_total by result",
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 21 },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [{ "expr": "sum(rate(leave_request_decisions_total[5m])) by (result)", "legendFormat": "{{result}}" }]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "leave_balance_lock_duration_seconds — p99 (LeaveBalance row-lock hold time)",
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 21 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [{ "expr": "histogram_quantile(0.99, sum(rate(leave_balance_lock_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p99" }]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "leave_approval_reminders_fired_total (BullMQ reminders that fired while still pending)",
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 28 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [{ "expr": "sum(rate(leave_approval_reminders_fired_total[15m]))", "legendFormat": "reminders/sec" }]
+    },
+    { "type": "row", "title": "Backdated leave (Phase 6)", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 35 }, "id": 103 },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "leave_backdated_submissions_total by result",
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 36 },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [{ "expr": "sum(rate(leave_backdated_submissions_total[15m])) by (result)", "legendFormat": "{{result}}" }]
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "leave_backdated_permission_denials_total (missing backdated_leave_entry:approve)",
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 36 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [{ "expr": "sum(rate(leave_backdated_permission_denials_total[15m]))", "legendFormat": "denials/sec" }]
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "leave_backdated_audit_events_total by result — a sustained \"failed\" rate means core's AuditService is unreachable",
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 36 },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [{ "expr": "sum(rate(leave_backdated_audit_events_total[15m])) by (result)", "legendFormat": "{{result}}" }]
+    },
+    { "type": "row", "title": "Carryover rollover/expiry (Phase 7, @Cron 03:00 UTC)", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 43 }, "id": 104 },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "leave_carryover_{rollover,expiry}_runs_total by result — a run should appear once/day; \"error\" here means the whole cross-tenant statement failed",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 44 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum(increase(leave_carryover_rollover_runs_total[1d])) by (result)", "legendFormat": "rollover: {{result}}" },
+        { "expr": "sum(increase(leave_carryover_expiry_runs_total[1d])) by (result)", "legendFormat": "expiry: {{result}}" }
+      ]
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Days rolled over vs. days expired, per day",
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 44 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum(increase(leave_carryover_days_rolled_over_total[1d]))", "legendFormat": "days rolled over" },
+        { "expr": "sum(increase(leave_carryover_days_expired_total[1d]))", "legendFormat": "days expired (clawed back)" }
+      ]
+    },
+    { "type": "row", "title": "Absence pattern detection (Phase 8, @Cron 04:00 UTC)", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 51 }, "id": 105 },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "absence_pattern_detection_runs_total by step/result — pre_post_holiday failing alone points at core's CalendarService, not Postgres",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 52 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [{ "expr": "sum(increase(absence_pattern_detection_runs_total[1d])) by (step, result)", "legendFormat": "{{step}}: {{result}}" }]
+    },
+    {
+      "id": 15,
+      "type": "timeseries",
+      "title": "absence_patterns_detected_total by pattern_type (new rows, dedup-gated per §2.2 rule 4)",
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 52 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [{ "expr": "sum(increase(absence_patterns_detected_total[1d])) by (pattern_type)", "legendFormat": "{{pattern_type}}" }]
+    },
+    {
+      "id": 16,
+      "type": "timeseries",
+      "title": "absence_pattern_acknowledgements_total by result",
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 59 },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [{ "expr": "sum(rate(absence_pattern_acknowledgements_total[15m])) by (result)", "legendFormat": "{{result}}" }]
+    },
+    { "type": "row", "title": "HTTP / process health", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 66 }, "id": 106 },
+    {
+      "id": 17,
+      "type": "timeseries",
+      "title": "HTTP request duration — p50/p95/p99 (all routes)",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 67 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p50" },
+        { "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95" },
+        { "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p99" }
+      ]
+    },
+    {
+      "id": 18,
+      "type": "timeseries",
+      "title": "HTTP requests by status code",
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 67 },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [{ "expr": "sum(rate(http_requests_total[5m])) by (status_code)", "legendFormat": "{{status_code}}" }]
+    },
+    {
+      "id": 19,
+      "type": "timeseries",
+      "title": "Event loop lag / RSS memory",
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 74 },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "targets": [
+        { "expr": "nodejs_eventloop_lag_seconds", "legendFormat": "eventloop lag (s)" },
+        { "expr": "process_resident_memory_bytes", "legendFormat": "RSS bytes" }
+      ]
+    }
+  ]
+}

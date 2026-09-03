@@ -1,0 +1,30 @@
+node_modules/
+dist/
+build/
+.pids/
+logs/
+*.log
+uploads/
+dump.rdb
+.env
+.env.*
+!.env.example
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+mlruns/
+lightning_logs/
+.run/
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
+
+# Expo
+.expo/

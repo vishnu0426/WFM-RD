@@ -1,0 +1,101 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+type AgentLiveState {
+  activityStartedAt: DateTime
+  adherenceStatus: String
+  currentActivity: String
+  dataFreshness: DataFreshness!
+  employeeId: ID!
+  queueId: ID
+  scheduledActivity: String
+  siteId: ID
+}
+
+type Alert {
+  acknowledgedAt: DateTime
+  acknowledgedBy: ID
+  alertType: String!
+  createdAt: DateTime!
+  dedupGroupId: ID!
+  escalatedAt: DateTime
+  id: ID!
+  lastTriggeredAt: DateTime!
+  orgUnitId: ID
+  queueId: ID
+  resolvedAt: DateTime
+  severity: String!
+  status: String!
+}
+
+type DataFreshness {
+  lastKnownUpdateAt: DateTime
+  status: String!
+}
+
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
+
+"""
+Arbitrary JSON value (object, array, string, number, boolean, or null).
+"""
+scalar JSON
+
+type Mutation {
+  acknowledgeAlert(alertId: ID!): Alert!
+  approveReallocation(reallocationId: ID!): ReallocationAction!
+  reportActivityChange(input: ReportActivityChangeInput!): ReportActivityChangeResult!
+}
+
+type Query {
+  activeAlerts(orgUnitId: ID): [Alert!]!
+  agentLiveState(employeeId: ID!): AgentLiveState
+  pendingReallocations(orgUnitId: ID): [ReallocationAction!]!
+  queueLiveState(queueId: ID!): QueueLiveState
+}
+
+type QueueLiveState {
+  agentsAvailable: Float
+  agentsOnCall: Float
+  currentVolume: Float
+  dataFreshness: DataFreshness!
+  forecastedVolume: Float
+  queueId: ID!
+  serviceLevelCurrent: Float
+  serviceLevelTarget: Float
+}
+
+type ReallocationAction {
+  affectedEmployeeIds: [ID!]!
+  aiRationale: JSON
+  createdAt: DateTime!
+  executedAt: DateTime
+  fromQueueId: ID!
+  id: ID!
+  reason: String!
+  status: String!
+  toQueueId: ID!
+  triggeredBy: String!
+}
+
+input ReportActivityChangeInput {
+  activityStartedAt: DateTime!
+  currentActivity: String!
+  employeeId: ID!
+  queueId: ID
+  siteId: ID
+}
+
+type ReportActivityChangeResult {
+  sourceEventId: String!
+  status: String!
+}
+
+type Subscription {
+  alertRaised(orgUnitId: ID, tenantId: ID!): Alert!
+  queueLiveStateUpdated(queueId: ID!): QueueLiveState!
+  reallocationSuggested(orgUnitId: ID, tenantId: ID!): ReallocationAction!
+}

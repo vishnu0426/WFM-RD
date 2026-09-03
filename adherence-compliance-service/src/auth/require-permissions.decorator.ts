@@ -1,0 +1,12 @@
+import { SetMetadata } from '@nestjs/common';
+
+export const PERMISSIONS_METADATA_KEY = 'requiredPermissions';
+
+/**
+ * ADR-0161: own copy of core's `require-permissions.decorator.ts` -
+ * identical shape. Marks a handler as requiring the named `resource:action`
+ * permission(s) (§3.4's claim format), enforced by `PermissionsGuard`,
+ * which must run after `AccessTokenGuard` (it reads `request.tokenClaims`).
+ * Multiple permissions are AND'd - the caller needs all of them.
+ */
+export const RequirePermissions = (...permissions: string[]) => SetMetadata(PERMISSIONS_METADATA_KEY, permissions);

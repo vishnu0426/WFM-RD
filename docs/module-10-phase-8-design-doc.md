@@ -1,0 +1,25 @@
+# Module 10 Phase 8 Design Doc — AI Layer: Prompt-Injection Verification, RBAC, and Dashboards
+
+**Status:** Approved for implementation
+**Owner:** AI Layer pod.
+**Scope:** §9's own Phase 8 line: "prompt-injection test suite, dashboards, the real security review." The RBAC gap this phase closes (`updateGovernancePolicy`/`configureAiProvider`) is the single most-repeated disclosed item across every readiness checklist since Phase 5.
+
+## Problem
+
+Three real gaps, three different kinds of closure:
+
+1. **No adversarial verification of §5.2's untrusted-content boundary existed.** Every system prompt has designed-in anti-injection language since Phase 2, but nothing had tried to defeat it or measured what happens if it fails. No live LLM call is available in this build (same disclosed posture throughout), so "does injection fool the model" can't be answered - but "what's the blast radius if it does" can be, and hadn't been.
+2. **`updateGovernancePolicy`/`configureAiProvider` were unprotected by RBAC**, escalating in urgency every phase since Phase 5. Closing this required first discovering what RBAC mechanism this platform actually has (a real, already-implemented `AccessTokenGuard`/`PermissionsGuard`/`@RequirePermissions` in core, ADR-0035) rather than inventing a second one for this module alone - and then solving the real problem that follows from ai-layer-service being a genuinely separate deployable service with no access to core's own token-verification database.
+3. **No dashboard existed for any of this module's own metrics** (`ai_interaction_duration_seconds`, `ai_llm_api_calls_total`, `ai_circuit_breaker_state_transitions_total`, `ai_degraded_mode_interactions_total`, `ai_tenant_scope_assertion_failures_total`, `ai_recommendations_by_autonomy_level_total`) - all real and observed since their respective phases, none visualized.
+
+## Decisions
+
+- **Prompt-injection suite** (ADR-0131): structural proof that untrusted content can't reach the system-prompt string; proof that a hypothetically-compromised model's extra JSON fields are silently dropped by the parser; proof that governance/autonomy resolution has no parameter path for LLM content to enter at all; and two real, disclosed exceptions found in the process - `confidenceIndicator` can be measurably inflated by a self-reported-confidence-plus-context-echo attack, and `rationaleText` reaches a human approver completely unfiltered, making human-in-the-loop a defense against the human's own judgment, not a code-level control.
+- **RBAC** (ADR-0130): own copies of core's real `AccessTokenGuard`/`PermissionsGuard`/`@RequirePermissions`, adapted for a remote-JWKS resource-server role (`jose.createRemoteJWKSet` against core's real `/.well-known/jwks.json`) instead of core's own direct DB read. A new `CurrentTokenClaims`/`assertTokenTenantMatches` pair closes a problem this cross-service split itself introduces: a valid token's own `tenant_id` claim must match the request's `x-tenant-id` header, or a token for tenant A could act against a spoofed header for tenant B. `ai_provider_config`/`ai_governance_policy` are registered as real resources in core's own permission-seeding script - not fabricated permission strings with nothing able to hold them.
+- **Dashboard**: `observability/grafana-dashboard-module-10.json`, mounted in `docker-compose.yml` (module-05/06's own dashboards exist on disk but were never mounted - a pre-existing gap this phase doesn't inherit). Panels for every real metric this module has emitted since Phase 1, plus a "known observability gaps" panel disclosing a finding made while building it: NestJS Guards run before `HttpMetricsInterceptor`, so the new RBAC guards' own 401/403 rejections are invisible to every HTTP/GraphQL metric on the dashboard.
+
+## Consequences / Verification
+
+- 44 new unit tests (30 prompt-injection, 14 RBAC - 6 of which exercise a real, ephemeral local JWKS HTTP server and real signed JWTs, not mocks) - 156 total, up from 112 at the start of this phase. `npm run typecheck`/`build`/`lint`/`test` all clean.
+- **Live-verified RBAC end to end**: a real local JWKS server, a real running `node dist/src/main.js` instance, and real signed JWTs proved all three gated paths against the real Postgres database - missing token (401), valid token missing the required permission (403, naming the exact permission), valid token whose own `tenant_id` claim doesn't match a spoofed `x-tenant-id` header (403), and a fully valid request (success, with a real `updated_by` UUID written from the token's own `sub` claim - closing another small, previously-disclosed "no identity gRPC call wired" gap as a side effect).
+- What's next: the real security/red-team review of §5 itself (this module's own standing pre-launch gate, never something a build phase substitutes for) remains outstanding, now more tightly scoped by this phase's own findings - the confidenceIndicator/rationaleText disclosures above are exactly the kind of finding that review should independently re-derive and go further on. RBAC could expand beyond these two mutations in a future phase, following the pattern this one established.

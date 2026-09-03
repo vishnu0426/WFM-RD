@@ -1,0 +1,102 @@
+syntax = "proto3";
+
+// §3.3/§0.6/ADR-0100: ComplianceRuleService - the read path Module 04's
+// PolicyService.GetActivePolicy merge logic calls, and the write-time gate
+// Module 02's EmploymentPolicy create/update path calls. Module 08's first
+// gRPC surface.
+package agno.compliance.v1;
+
+service ComplianceRuleService {
+  rpc GetActiveRule(GetActiveRuleRequest) returns (ComplianceRuleResponse);
+  rpc ValidatePolicyAgainstFloor(ValidatePolicyAgainstFloorRequest) returns (ValidatePolicyAgainstFloorResponse);
+}
+
+message GetActiveRuleRequest {
+  // ADR-0100: added beyond the module prompt's literal 3-arg signature
+  // (jurisdiction, rule_type, as_of) - required to resolve ADR-0095's
+  // tenant-override-vs-platform-default floor correctly; without it, this
+  // RPC could only ever see platform-default rows.
+  string tenant_id = 1;
+  string jurisdiction = 2;
+  string rule_type = 3;
+  // RFC 3339 timestamp. Empty = now.
+  string as_of = 4;
+}
+
+message ComplianceRuleResponse {
+  bool found = 1;
+  string id = 2;
+  string jurisdiction = 3;
+  string rule_type = 4;
+  // JSON-encoded `ComplianceRule.definition` (jsonb, arbitrary shape per rule_type).
+  string definition_json = 5;
+  string effective_from = 6;
+  // Empty string when unset.
+  string effective_to = 7;
+  int32 version = 8;
+  string citation = 9;
+  bool is_platform_default = 10;
+}
+
+message ValidatePolicyAgainstFloorRequest {
+  // ADR-0100: `tenant_id` and `rule_type` both added beyond the module
+  // prompt's literal 2-arg signature (jurisdiction, policy_definition) -
+  // `rule_type` is required to know which floor a policy's `definition`
+  // shape should even be compared against; `tenant_id` for the same
+  // reason `GetActiveRule` needs it.
+  string tenant_id = 1;
+  string jurisdiction = 2;
+  string rule_type = 3;
+  // JSON-encoded arbitrary policy definition (Module 02's `Policy.definition`
+  // or this module's own `ComplianceRule.definition`, per-field shape
+  // matching whichever `rule_type` was passed).
+  string policy_definition_json = 4;
+}
+
+message ValidatePolicyAgainstFloorResponse {
+  bool valid = 1;
+  repeated string violations = 2;
+  // True when no ComplianceRule floor exists for this (jurisdiction,
+  // rule_type) at all - distinct from `valid: true`, which means "a floor
+  // exists and this policy meets it." A caller should not block a write on
+  // `floor_not_found` alone (§0.6's floor cannot reject what it doesn't yet
+  // encode) - but should not conflate the two states either.
+  bool floor_not_found = 3;
+}
+
+// Module 10 Phase 4 (docs/adr/0121): root-cause-analysis's adherence data
+// source - the same roster-then-AdherenceScore join
+// ComplianceReportService.buildAdherenceSummary already uses for the
+// adherence_summary CSV report, aggregated into a summary rather than a
+// per-employee/period dump. This service's second gRPC surface.
+service AdherenceRollupService {
+  rpc GetOrgUnitAdherenceSummary(GetOrgUnitAdherenceSummaryRequest) returns (GetOrgUnitAdherenceSummaryResponse);
+}
+
+message GetOrgUnitAdherenceSummaryRequest {
+  string tenant_id = 1;
+  string org_unit_id = 2;
+  string period_start = 3; // RFC 3339, inclusive
+  string period_end = 4;   // RFC 3339, exclusive
+}
+
+message GetOrgUnitAdherenceSummaryResponse {
+  // false when the org unit's roster is empty, or has zero AdherenceScore
+  // rows in the requested window - a caller error/no-data case to surface
+  // clearly, never a synthetic zero.
+  bool found = 1;
+  string tenant_id = 2;
+  // The org unit's full schedulable roster size, per EmployeeService -
+  // may exceed scored_employee_count (not every employee necessarily has
+  // an AdherenceScore row in this window, e.g. new hires, leave).
+  int32 employee_count = 3;
+  int32 scored_employee_count = 4;
+  // Total AdherenceScore rows aggregated (one employee can contribute
+  // several, one per period_type/period_start in the window).
+  int32 period_count = 5;
+  // Decimal-as-string (proto3 has no native decimal type).
+  string average_adherence_pct = 6;
+  int32 total_major_deviation_count = 7;
+  string min_adherence_pct = 8;
+  string max_adherence_pct = 9;
+}

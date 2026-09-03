@@ -1,0 +1,104 @@
+syntax = "proto3";
+
+// §3.3: EmployeeService - Scheduling's primary input. Scheduling never
+// queries the Employee database directly (§3.3's own stated rationale for
+// this boundary); this contract, once real consumers depend on it, gets the
+// same deprecation discipline as a public API change.
+package agno.org.v1;
+
+service EmployeeService {
+  // Server-streaming so a large org unit's schedulable-employee set is never
+  // returned as one unbounded response - the server internally pages through
+  // results and emits one message per employee (Phase 7 design doc).
+  rpc GetSchedulableEmployees(GetSchedulableEmployeesRequest) returns (stream SchedulableEmployee);
+
+  // Sparse (one entry per employee/skill pair that actually exists), not a
+  // dense matrix - most employees don't have most skills (§3.3).
+  rpc GetEmployeeSkillMatrix(GetEmployeeSkillMatrixRequest) returns (EmployeeSkillMatrixResponse);
+
+  // docs/adr/0099: closes Module 08's permanent employee-id -> org-unit-id
+  // gap (needed to resolve which timezone/jurisdiction an employee's
+  // adherence rollup should use). Sparse, same convention as
+  // GetEmployeeSkillMatrix - an id with no matching employee row is simply
+  // absent from the response, not an error.
+  rpc GetEmployeeOrgUnits(GetEmployeeOrgUnitsRequest) returns (EmployeeOrgUnitsResponse);
+
+  // docs/adr/0150/docs/adr/0157: the cross-service-callable form of the
+  // reverse `userId -> Employee` lookup (`me { employee }` is the
+  // GraphQL-only form, unreachable by a non-root service that can't call
+  // core's GraphQL BFF as itself). `found: false` when the user exists but
+  // has no linked employee, or the user id itself doesn't resolve - not an
+  // error, the same "absent, not a fault" posture GetEmployeeOrgUnits uses.
+  rpc GetEmployeeIdForUser(GetEmployeeIdForUserRequest) returns (GetEmployeeIdForUserResponse);
+}
+
+message GetSchedulableEmployeesRequest {
+  string tenant_id = 1;
+  string org_unit_id = 2;
+  // Employee must have every one of these skills (any proficiency/decay
+  // level - decay is a soft-constraint weight for the solver, not a filter
+  // here, per §2.2 rule 3: "never a hard has-skill/doesn't-have-skill
+  // boolean" - this filter IS the hard boolean; decay stays a solver input).
+  repeated string required_skill_ids = 3;
+  double min_contract_hours_per_week = 4;
+  // Server-side page size for the internal stream chunking; the server
+  // clamps this to a configurable maximum, it is not a client-controlled
+  // unbounded request.
+  int32 page_size = 5;
+}
+
+message SchedulableEmployee {
+  string employee_id = 1;
+  string employee_number = 2;
+  string org_unit_id = 3;
+  double contract_hours_per_week = 4;
+  string employment_type = 5;
+  // Module 07 (docs/adr/0088): `org.employees.hire_date` was already a
+  // real, populated column - just never carried across this RPC boundary
+  // before anything needed it. RFC 3339 date (YYYY-MM-DD), never empty -
+  // `hire_date` is `NOT NULL` in the schema (every schedulable employee has
+  // one).
+  string hire_date = 6;
+}
+
+message GetEmployeeSkillMatrixRequest {
+  string tenant_id = 1;
+  repeated string employee_ids = 2;
+}
+
+message EmployeeSkillMatrixResponse {
+  repeated EmployeeSkillEntry entries = 1;
+}
+
+message EmployeeSkillEntry {
+  string employee_id = 1;
+  string skill_id = 2;
+  string proficiency_level = 3;
+  double decay_score = 4;
+  // Empty string, not a sentinel date, when the skill has no expiry.
+  string expiry_date = 5;
+}
+
+message GetEmployeeOrgUnitsRequest {
+  string tenant_id = 1;
+  repeated string employee_ids = 2;
+}
+
+message EmployeeOrgUnitsResponse {
+  repeated EmployeeOrgUnitEntry entries = 1;
+}
+
+message EmployeeOrgUnitEntry {
+  string employee_id = 1;
+  string org_unit_id = 2;
+}
+
+message GetEmployeeIdForUserRequest {
+  string tenant_id = 1;
+  string user_id = 2;
+}
+
+message GetEmployeeIdForUserResponse {
+  bool found = 1;
+  string employee_id = 2;
+}

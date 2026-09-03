@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+// §3.3: IdentityService - "every downstream service calls this once per
+// request and caches briefly in Redis." Internal-only (§1's gRPC/protobuf
+// service-to-service boundary) - never called directly by an external
+// client, unlike the OAuth/OIDC REST surface (src/modules/auth/rest) real
+// clients use to obtain the token this service then validates.
+package agno.core.v1;
+
+service IdentityService {
+  // Verifies a JWS access token's signature (against the active/recently-
+  // retired signing key, ADR-0024), `iss`/`aud`/`exp`, and revocation
+  // status (Redis blacklist, §5.2). `valid = false` with `error_code` set
+  // is a normal response, not a gRPC error status - callers branch on
+  // `valid`, they don't catch an exception for an expired/invalid token.
+  rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse);
+
+  // Fresh roles/permissions/org_unit_id for an already-authenticated
+  // tenant_id+user_id pair (cache-aside via UserContextCacheService, 60s
+  // TTL - §3.3). Callers that already hold a validated token from
+  // ValidateToken typically don't need this separately; it exists for a
+  // caller that wants to force a fresh read (e.g. immediately after an
+  // admin operation it knows changed the user's roles).
+  rpc GetUserContext(GetUserContextRequest) returns (GetUserContextResponse);
+}
+
+message ValidateTokenRequest {
+  string access_token = 1;
+}
+
+message ValidateTokenResponse {
+  bool valid = 1;
+  string tenant_id = 2;
+  string user_id = 3;
+  // Empty string, not a sentinel, when the token carries no org unit scope.
+  string org_unit_id = 4;
+  repeated string roles = 5;
+  repeated string permissions = 6;
+  repeated string amr = 7;
+  int64 exp = 8;
+  // Canonical error-code registry (§3.4) string, e.g. "OAUTH_INVALID_GRANT",
+  // "TOKEN_REVOKED" - empty when valid = true.
+  string error_code = 9;
+}
+
+message GetUserContextRequest {
+  string tenant_id = 1;
+  string user_id = 2;
+}
+
+message GetUserContextResponse {
+  repeated string roles = 1;
+  repeated string permissions = 2;
+  string org_unit_id = 3;
+}

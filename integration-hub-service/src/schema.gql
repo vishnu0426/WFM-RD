@@ -1,0 +1,159 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+type ConnectorHealth {
+  connectorId: ID!
+  connectorType: ConnectorType!
+  hasActiveStreamingSession: Boolean!
+  lastSyncAt: DateTime
+  lastSyncStatus: SyncJobStatus
+  provider: String!
+  recentSyncJobs: [SyncJob!]!
+  status: ConnectorStatus!
+}
+
+enum ConnectorStatus {
+  ACTIVE
+  ERROR
+  PAUSED
+  PENDING_SETUP
+}
+
+enum ConnectorType {
+  ACD
+  CRM
+  CUSTOM_WEBHOOK
+  HRIS
+  PAYROLL
+}
+
+type CreateConnectorResult {
+  authorizationUrl: String
+  connector: IntegrationConnector!
+}
+
+type CreateWebhookSubscriptionResult {
+  secret: String!
+  subscription: WebhookSubscription!
+}
+
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
+
+type FieldAuthorityPolicy {
+  authoritativeSource: FieldAuthoritySource!
+  conflictAction: FieldConflictAction!
+  connectorId: ID!
+  fieldName: String!
+  id: ID!
+}
+
+enum FieldAuthoritySource {
+  AGNO_WFM
+  EXTERNAL_SYSTEM
+}
+
+enum FieldConflictAction {
+  FLAG_FOR_REVIEW
+  OVERWRITE
+  REJECT_SYNC
+}
+
+type FieldMapping {
+  authority: String
+  connectorId: ID!
+  id: ID!
+  sourceField: String!
+  targetField: String!
+  transformationRule: JSON
+}
+
+enum FieldMappingAuthority {
+  AGNO_AUTHORITATIVE
+  MANUAL_REVIEW
+  SOURCE_AUTHORITATIVE
+}
+
+type IntegrationConnector {
+  connectorType: ConnectorType!
+  id: ID!
+  lastSyncAt: DateTime
+  lastSyncStatus: SyncJobStatus
+  provider: String!
+  status: ConnectorStatus!
+}
+
+"""
+Arbitrary JSON value (object, array, string, number, boolean, or null).
+"""
+scalar JSON
+
+type Mutation {
+  createConnector(additionalConfig: JSON, connectorType: ConnectorType!, credentials: JSON, oauthAuthorizationEndpoint: String, oauthClientId: String, oauthClientSecret: String, oauthRedirectUri: String, oauthScope: String, oauthTokenEndpoint: String, provider: String!): CreateConnectorResult!
+  createFieldAuthorityPolicy(authoritativeSource: FieldAuthoritySource!, conflictAction: FieldConflictAction!, connectorId: String!, fieldName: String!): FieldAuthorityPolicy!
+  createWebhookSubscription(eventTypes: [String!]!, targetUrl: String!): CreateWebhookSubscriptionResult!
+  testWebhook(subscriptionId: ID!): WebhookDelivery!
+  triggerManualSync(connectorId: ID!): SyncJob!
+  updateFieldMapping(authority: FieldMappingAuthority, connectorId: String!, sourceField: String!, targetField: String!, transformationRule: JSON): FieldMapping!
+}
+
+type Query {
+  connectorHealth(connectorId: ID!): ConnectorHealth!
+  connectors: [IntegrationConnector!]!
+  connectorsHealth: [ConnectorHealth!]!
+  fieldAuthorityPolicies(connectorId: String!): [FieldAuthorityPolicy!]!
+  fieldMappings(connectorId: String!): [FieldMapping!]!
+  syncJobHistory(connectorId: String!, limit: Float): [SyncJob!]!
+  webhookDeliveries(limit: Float, subscriptionId: ID!): [WebhookDelivery!]!
+  webhookSubscriptions: [WebhookSubscription!]!
+}
+
+type SyncJob {
+  completedAt: DateTime
+  connectorId: ID!
+  errorDetails: JSON
+  id: ID!
+  rateLimitedUntil: DateTime
+  recordsConflicted: Float
+  recordsFailed: Float!
+  recordsProcessed: Float!
+  startedAt: DateTime!
+  status: String!
+  syncType: String!
+}
+
+enum SyncJobStatus {
+  COMPLETED
+  FAILED
+  PARTIAL_FAILURE
+  QUEUED
+  RUNNING
+}
+
+type WebhookDelivery {
+  createdAt: DateTime!
+  deliveredAt: DateTime
+  eventType: String!
+  id: ID!
+  payload: JSON
+  responseStatusCode: Float
+  retryCount: Float!
+  webhookSubscriptionId: ID!
+}
+
+type WebhookSubscription {
+  consecutiveFailureCount: Float!
+  eventTypes: [String!]!
+  id: ID!
+  status: WebhookSubscriptionStatus!
+  targetUrl: String!
+}
+
+enum WebhookSubscriptionStatus {
+  ACTIVE
+  DISABLED
+  FAILING
+}

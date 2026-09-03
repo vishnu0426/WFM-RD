@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+// Module 11 Phase 5 (ADR-0154): the real "wiring into Module 01's
+// notification center" the source spec asks for turns out to mean this -
+// `NotificationPreference` (§below) has no dispatcher anywhere in this
+// repo, so the only thing worth exposing to another service is the
+// preference *check* itself, not a send capability core doesn't have.
+// `channel` is deliberately NOT a request field - this phase only ever
+// checks the `push` channel, and a generic multi-channel contract would
+// overstate what's actually implemented (ADR-0154 §4).
+package agno.core.v1;
+
+service NotificationPreferenceService {
+  rpc IsPushEnabled(IsPushEnabledRequest) returns (IsPushEnabledResponse);
+}
+
+message IsPushEnabledRequest {
+  string tenant_id = 1;
+  string employee_id = 2;
+  // e.g. 'leave.request.approved' - matches NotificationPreference.event_type.
+  string event_type = 3;
+}
+
+message IsPushEnabledResponse {
+  // Resolved decision, default already applied server-side (ADR-0154 §5):
+  // true when no preference row exists at all, since
+  // NotificationPreference has no write surface anywhere yet - an opt-in
+  // default would make push permanently unreachable for everyone.
+  bool enabled = 1;
+  // Diagnostic only, not part of the decision - lets the caller log *why*
+  // a send was skipped (no linked user account vs. an explicit opt-out)
+  // rather than one undifferentiated "skipped".
+  bool employee_has_linked_user = 2;
+}

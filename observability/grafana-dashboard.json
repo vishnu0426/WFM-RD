@@ -1,0 +1,122 @@
+{
+  "title": "AGNO WFM — Module 01 Platform Core (Phase 7 SLO Dashboard)",
+  "uid": "agno-wfm-module01-slo",
+  "schemaVersion": 39,
+  "timezone": "browser",
+  "time": { "from": "now-6h", "to": "now" },
+  "refresh": "30s",
+  "tags": ["agno-wfm", "module-01", "slo"],
+  "panels": [
+    { "type": "row", "title": "SLO — IdentityService gRPC (§0.5: p99 < 50ms, 99.95% availability)", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }, "id": 100 },
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "IdentityService.ValidateToken / GetUserContext — p99 latency vs 50ms target",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "s", "custom": { "drawStyle": "line" } }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{route=~\"IdentityGrpcController.*\"}[5m])) by (le, route))",
+          "legendFormat": "{{route}} p99"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "IdentityService gRPC — availability (non-error rate) vs 99.95% target",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total{route=~\"IdentityGrpcController.*\",status_code!~\"5..\"}[5m])) / sum(rate(http_requests_total{route=~\"IdentityGrpcController.*\"}[5m]))",
+          "legendFormat": "availability"
+        }
+      ]
+    },
+    { "type": "row", "title": "SLO — SSO callback success rate (§0.5: >= 99.9%)", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 }, "id": 101 },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "POST /v1/auth/sso/callback — success rate",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 10 },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total{route=\"/v1/auth/sso/callback\",status_code!~\"4..|5..\"}[15m])) / sum(rate(http_requests_total{route=\"/v1/auth/sso/callback\"}[15m]))",
+          "legendFormat": "success rate"
+        }
+      ]
+    },
+    { "type": "row", "title": "Platform-wide API health", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 18 }, "id": 102 },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Request rate (RPS) by route",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 19 },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [{ "expr": "sum(rate(http_requests_total[5m])) by (route)", "legendFormat": "{{route}}" }]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "5xx error rate by route",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 19 },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum(rate(http_requests_total{status_code=~\"5..\"}[5m])) by (route)", "legendFormat": "{{route}}" }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Overall latency (p50 / p95 / p99)",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 19 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p50" },
+        { "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95" },
+        { "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p99" }
+      ]
+    },
+    { "type": "row", "title": "Durable queue depth (ADR-0039 / ADR-0042 / ADR-0046)", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 27 }, "id": 103 },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "core.outbox_events unpublished",
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 28 },
+      "targets": [{ "expr": "core_outbox_events_unpublished", "legendFormat": "unpublished" }]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "core.pending_audit_events",
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 28 },
+      "targets": [{ "expr": "core_pending_audit_events", "legendFormat": "pending" }]
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "core.webhook_deliveries pending",
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 28 },
+      "targets": [{ "expr": "core_webhook_deliveries_pending", "legendFormat": "pending" }]
+    },
+    { "type": "row", "title": "Process health", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 35 }, "id": 104 },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Resident memory (RSS)",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 36 },
+      "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] },
+      "targets": [{ "expr": "process_resident_memory_bytes", "legendFormat": "RSS" }]
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Event loop lag",
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 36 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [{ "expr": "nodejs_eventloop_lag_seconds", "legendFormat": "lag" }]
+    }
+  ]
+}

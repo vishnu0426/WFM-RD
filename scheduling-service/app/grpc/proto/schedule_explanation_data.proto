@@ -1,0 +1,68 @@
+syntax = "proto3";
+
+// Module 10 Phase 2 (docs/adr/0115): the read half of the Module 04<->
+// Module 10 schedule-explanation handoff this service's own Phase 6 design
+// doc (§1: "Module 04 requests it, doesn't own the LLM call") and README
+// already named but never built - `SubmitExplanationRequest`/
+// `ScheduleExplanationResponse` (jobs.py) are the WRITE half (Module 10
+// calls back with a generated explanation over REST); until this phase,
+// nothing exposed the raw solve data Module 10 needs to generate one in the
+// first place. Same "reuse the owning service's own read path, add a gRPC
+// server surface for it" posture as `schedule_query.proto` (docs/adr/0103) -
+// this service's third gRPC server surface, same process/port, no new
+// CPU-bound work (a plain SELECT by primary key, nowhere near the CP-SAT
+// work ADR-0060 moved onto app/worker.py).
+//
+// Regenerate stubs after editing this file (then reapply the `from . import`
+// fix atop the plain `import schedule_explanation_data_pb2` line
+// grpc_tools.protoc always emits in
+// schedule_explanation_data_pb2_grpc.py - it assumes the generated dir is
+// on sys.path directly, which it isn't here):
+//   .venv/bin/python -m grpc_tools.protoc -I app/grpc/proto \
+//     --python_out=app/grpc/generated --grpc_python_out=app/grpc/generated \
+//     --pyi_out=app/grpc/generated app/grpc/proto/schedule_explanation_data.proto
+package agno.scheduling.v1;
+
+service ScheduleExplanationDataService {
+  rpc GetScheduleJobForExplanation(GetScheduleJobForExplanationRequest)
+      returns (GetScheduleJobForExplanationResponse);
+}
+
+message GetScheduleJobForExplanationRequest {
+  string tenant_id = 1;
+  string job_id = 2;
+}
+
+message GetScheduleJobForExplanationResponse {
+  // false when job_id doesn't exist or belongs to a different tenant - a
+  // caller error to surface clearly (ForecastService.GetForecastRequirements'
+  // own `found` convention, docs/adr/0059), never data to guess at.
+  bool found = 1;
+  // Echoed back from the persisted row (not just the request's own
+  // tenant_id) - Module 10's §5.1 tenant-scoping assertion step compares
+  // THIS field against the requesting user's own bound tenant, as defense
+  // in depth against a query-router bug that requested the wrong scope in
+  // the first place (§5.1: "the owning module's own tenant isolation is
+  // the actual backstop"). `get_job`'s own `tenant_id` filter is what makes
+  // this field trustworthy - it can only ever equal `request.tenant_id` or
+  // this response wouldn't have `found = true` at all.
+  string tenant_id = 11;
+  // queued | solving | completed | infeasible | failed
+  string status = 2;
+  string org_unit_id = 3;
+  string date_range_start = 4; // RFC 3339 date
+  string date_range_end = 5;   // RFC 3339 date
+  // Decimal-as-string (ForecastService's own "proto3 has no native decimal
+  // type" precedent) - empty when NULL (job not yet completed).
+  string objective_score = 6;
+  // JSON-encoded ConstraintConfigInput - "{}" default, never empty/absent.
+  string constraint_config_json = 7;
+  // JSON-encoded relaxations_applied - empty string when NULL (job never
+  // needed relaxation, or hasn't completed yet).
+  string relaxations_applied_json = 8;
+  // JSON-encoded decomposition_plan - empty string when NULL (job never
+  // crossed the decomposition threshold, or hasn't completed yet).
+  string decomposition_plan_json = 9;
+  // RFC 3339 timestamp - empty string when NULL (not yet completed).
+  string completed_at = 10;
+}

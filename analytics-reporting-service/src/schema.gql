@@ -1,0 +1,124 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+type AnalyticsAnswer {
+  answerText: String!
+  question: String!
+  results: [MetricResult!]!
+}
+
+input CalculationDefinitionInputType {
+  dimensions: [String!]
+  sourceView: String!
+  valueColumn: String!
+}
+
+input CreateDashboardInputType {
+  config: JSON!
+  name: String!
+  sharedWithRoles: [String!]
+  widgets: [CreateDashboardWidgetInputType!]!
+}
+
+input CreateDashboardWidgetInputType {
+  metricId: ID!
+  position: JSON!
+  widgetType: String!
+}
+
+input CreateMetricDefinitionInputType {
+  calculationDefinition: CalculationDefinitionInputType!
+  category: MetricCategory!
+  name: String!
+}
+
+type Dashboard {
+  createdBy: ID!
+  id: ID!
+  name: String!
+  sharedWith: [String!]!
+  widgets: [DashboardWidget!]!
+}
+
+type DashboardWidget {
+  id: ID!
+  metricId: ID!
+  position: JSON!
+  widgetType: String!
+}
+
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
+
+"""
+§4.1's executiveSummary(orgUnitId, period) - server-resolved into concrete date bounds, see metric-query-engine.service.ts's own resolvePeriodBounds.
+"""
+enum ExecutiveSummaryPeriod {
+  CURRENT_MONTH
+  LAST_MONTH
+  LAST_QUARTER
+}
+
+"""
+Arbitrary JSON value (object, array, string, number, boolean, or null).
+"""
+scalar JSON
+
+"""
+§2.1's fixed metric-category vocabulary - the same enum this module's schema CHECK constraint enforces.
+"""
+enum MetricCategory {
+  ATTENDANCE
+  COST
+  FORECAST_ACCURACY
+  OCCUPANCY
+  PERFORMANCE
+}
+
+type MetricDefinition {
+  calculationDefinition: JSON!
+  category: MetricCategory!
+  estimatedCostTier: String
+  id: ID!
+  isPlatformDefault: Boolean!
+  name: String!
+  validatedAt: DateTime
+}
+
+input MetricQueryFilterInputType {
+  costCenter: String
+  limit: Int
+  orgUnitId: ID
+  periodEnd: DateTime
+  periodStart: DateTime
+  periodType: String
+  siteOrgUnitId: ID
+}
+
+type MetricResult {
+  comparisonPeriodValue: Float
+  dataAsOf: DateTime
+  metric: String!
+  periodEnd: DateTime!
+  periodStart: DateTime!
+  trend: String
+  value: Float
+}
+
+type Mutation {
+  askAnalyticsQuestion(question: String!): AnalyticsAnswer!
+  createDashboard(input: CreateDashboardInputType!): Dashboard!
+  createMetricDefinition(input: CreateMetricDefinitionInputType!): MetricDefinition!
+  updateDashboard(id: ID!, input: CreateDashboardInputType!): Dashboard!
+}
+
+type Query {
+  dashboard(id: ID!): Dashboard!
+  executiveSummary(orgUnitId: ID, period: ExecutiveSummaryPeriod!): [MetricResult!]!
+  metricDefinitions: [MetricDefinition!]!
+  metricQuery(filter: MetricQueryFilterInputType, metricName: String!): [MetricResult!]!
+  myDashboards: [Dashboard!]!
+}

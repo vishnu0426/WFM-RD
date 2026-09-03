@@ -1,0 +1,67 @@
+syntax = "proto3";
+
+// §3.4/Phase 5: LeaveService - closes the permanent gap scheduling-service's
+// own ADR-0059 documented ("no real leave/unavailability source exists
+// anywhere in the platform... permanently, until Module 06 ships"). This is
+// the pull direction only: Module 04 calls GetUnavailability at solve time
+// (§4.3's mid-solve gRPC pull pattern, same shape as EmployeeService/
+// PolicyService/ForecastService). The opposite direction - Module 06 calling
+// into Module 04 for schedule-conflict checks at leave-request time - is
+// deliberately REST, not gRPC (Phase 1 design doc's explicit assumption 2:
+// scheduling-service exposes no gRPC server of its own), so it has no
+// counterpart RPC here. See ADR-0078 for the full contract decision and
+// scheduling-service's own re-pointing.
+//
+// Regenerate scheduling-service's Python stubs after editing this file:
+//   scheduling-service/.venv/bin/python -m grpc_tools.protoc \
+//     -I ../attendance-leave-service/src/grpc/proto \
+//     --python_out=app/grpc_clients/generated \
+//     --grpc_python_out=app/grpc_clients/generated \
+//     --pyi_out=app/grpc_clients/generated \
+//     ../attendance-leave-service/src/grpc/proto/leave.proto
+// (run from scheduling-service/, matching forecast.proto's own documented
+// command shape - no local copy of this .proto is checked into
+// scheduling-service, same as employee.proto/policy.proto today).
+package agno.leave.v1;
+
+service LeaveService {
+  // §2.2 rule 2's "only approved/confirmed absences" constraint applies here
+  // too, from the other side: this must never return a pending or rejected
+  // LeaveRequest - scheduling-service treats every returned record as an
+  // absolute, non-relaxable hard constraint (ADR-0057), so an unapproved
+  // leave request appearing here would let this module unilaterally block
+  // a shift no human ever actually approved blocking.
+  rpc GetUnavailability(GetUnavailabilityRequest) returns (GetUnavailabilityResponse);
+}
+
+message GetUnavailabilityRequest {
+  string tenant_id = 1;
+  repeated string employee_ids = 2;
+  // Inclusive on both ends, `YYYY-MM-DD` - matches ShiftAssignment's own
+  // date-range convention (ADR-0064's `from`/`to`), not a timestamp.
+  string date_range_start = 3;
+  string date_range_end = 4;
+}
+
+message GetUnavailabilityResponse {
+  repeated UnavailabilityRecord records = 1;
+}
+
+message UnavailabilityRecord {
+  string employee_id = 1;
+  // Inclusive, `YYYY-MM-DD` - mirrors LeaveRequest.date_range_start/end
+  // exactly (one record per approved LeaveRequest, not merged/split across
+  // overlapping requests - there shouldn't be any, ADR-0074's balance lock
+  // prevents overlapping approved requests from the same employee/leave
+  // type, though nothing prevents two *different* leave types' approved
+  // windows from overlapping - the solver treats each record independently
+  // either way).
+  string start_date = 2;
+  string end_date = 3;
+  // Informational only - scheduling-service's own LeaveRecord dataclass
+  // has no leave-type concept and does not consume this field. Carried on
+  // the wire for §3.4's literal `{ employeeId, dateRange, leaveType }`
+  // shape and for a future consumer that might care which leave type
+  // blocked a shift.
+  string leave_type_id = 4;
+}

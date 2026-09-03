@@ -1,0 +1,13 @@
+{
+  "rootDir": "..",
+  "testEnvironment": "node",
+  "testRegex": "test/unit/.*\\.spec\\.ts$",
+  "transform": {
+    "^.+\\.ts$": "ts-jest",
+    "/node_modules/.+\\.js$": "babel-jest"
+  },
+  "transformIgnorePatterns": ["/node_modules/(?!(uuid|@nestjs|@apollo|jose|openid-client)/)"],
+  "moduleFileExtensions": ["js", "json", "ts"],
+  "collectCoverageFrom": ["src/**/*.(t|j)s"],
+  "coverageDirectory": "coverage/unit"
+}

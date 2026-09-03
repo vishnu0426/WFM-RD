@@ -1,0 +1,76 @@
+syntax = "proto3";
+
+package agno.ai_layer.v1;
+
+// ADR-0165: Module 10's first *inbound* gRPC surface - every other gRPC
+// client/server pair in this platform has Module 10 as the caller (it
+// gathers context from Module 03/04/05/08's own gRPC servers). This is the
+// reverse: Module 09 calls in, handing Module 10 a natural-language
+// question (plus, for GenerateAnswer, the query results Module 09 already
+// executed) and getting back either a structured query to execute or a
+// prose answer. Module 10 still owns the one thing that makes it Module 10
+// - resolving the tenant's configured LLM provider and making the actual
+// call - Module 09 never gains its own LLM-calling capability.
+//
+// Every response carries its own `error_code` (empty string on success)
+// rather than a gRPC-level failure status - same "return a typed outcome,
+// don't throw across the wire" convention
+// `ComplianceRuleGrpcController.getActiveRule`'s `found: false` sentinel
+// already established in this platform, so the client (`GrpcNlQueryBridgeClient`,
+// analytics-reporting-service) never has to parse a raw gRPC `Status`.
+service NlQueryBridgeService {
+  rpc TranslateQuestion(TranslateQuestionRequest) returns (TranslateQuestionResponse);
+  rpc GenerateAnswer(GenerateAnswerRequest) returns (GenerateAnswerResponse);
+}
+
+message TranslateQuestionRequest {
+  string tenant_id = 1;
+  // "" when the originating GraphQL request carried no authenticated actor
+  // (never expected in practice - `askAnalyticsQuestion` requires
+  // `metric_definition:read` - but the field stays optional rather than
+  // assumed non-empty, same posture `AskQuestionService`'s own `userId: string | null` takes).
+  string user_id = 2;
+  string question = 3;
+  // The tenant's real, currently-visible metric catalog
+  // (`MetricDefinitionService.listVisibleMetrics`) - the one grounding
+  // fact that keeps translation from hallucinating a metric name Module 09
+  // would just reject at query time.
+  repeated string available_metric_names = 4;
+}
+
+message TranslateQuestionResponse {
+  // "" on success. "UNAVAILABLE" (no non-LLM fallback exists for
+  // translation, same as `AskQuestionService`'s own posture),
+  // "RATE_LIMITED", or "QUESTION_TOO_LONG".
+  string error_code = 1;
+  // Set only when error_code == "RATE_LIMITED".
+  int32 retry_after_seconds = 2;
+  // "metric_query" | "executive_summary" - the only two shapes
+  // `StructuredAnalyticsQuery` (analytics-reporting-service) recognizes.
+  string kind = 3;
+  // Set when kind == "metric_query" - always one of available_metric_names.
+  string metric_name = 4;
+  // JSON-encoded MetricQueryFilter subset (periodStart/periodEnd/orgUnitId/
+  // costCenter/siteOrgUnitId/periodType/limit) - "" when kind == "executive_summary".
+  string filter_json = 5;
+  // Set when kind == "executive_summary" and the question named one.
+  string org_unit_id = 6;
+  // Set when kind == "executive_summary": "current_month" | "last_month" | "last_quarter".
+  string period = 7;
+}
+
+message GenerateAnswerRequest {
+  string tenant_id = 1;
+  string user_id = 2;
+  string question = 3;
+  // JSON-encoded MetricResultData[] - the real results Module 09 already
+  // executed via MetricQueryEngineService, never re-fetched here.
+  string results_json = 4;
+}
+
+message GenerateAnswerResponse {
+  // "" on success. "UNAVAILABLE" or "RATE_LIMITED" - see TranslateQuestionResponse.
+  string error_code = 1;
+  int32 retry_after_seconds = 2;
+  string answer_text = 3;
+}

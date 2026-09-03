@@ -1,0 +1,135 @@
+# Phase 6 (§1's "Envoy gateway" requirement, ADR-0048). Local-dev/reference
+# config, not a production deployment manifest - see docs/phase-6-design-doc.md
+# and the Phase 6 readiness checklist for what's deliberately not here
+# (per-tenant PolicyType.RATE_LIMIT-driven quotas, mTLS, JWT verification at
+# the edge, autodiscovery).
+#
+# Routing: everything this app serves over plain HTTP (REST /oauth/*, /v1/*,
+# /scim/*, /webauthn/*, /.well-known/*, and GraphQL /graphql) goes through one
+# listener on 8080; the internal gRPC surface (IdentityService/PolicyService/
+# AuditService/EmployeeService/CalendarService, §3.3) gets its own h2c
+# listener on 8081, since gRPC needs HTTP/2 and the REST/GraphQL surface
+# doesn't.
+static_resources:
+  listeners:
+    - name: edge_http_listener
+      address:
+        socket_address: { address: 0.0.0.0, port_value: 8080 }
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: agno_edge_http
+                access_log:
+                  - name: envoy.access_loggers.stdout
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog
+                http_filters:
+                  # Coarse, per-Envoy-instance safety net only - NOT the
+                  # per-tenant quota §3.4 describes (`PolicyType.RATE_LIMIT`,
+                  # `core.policies`). Enforcing *that* requires an external
+                  # Rate Limit Service (`envoy.filters.http.ratelimit` +
+                  # Envoy's RLS gRPC protocol) that looks up each tenant's
+                  # policy - deliberately not built this phase, see
+                  # ADR-0048's consequences and the readiness checklist.
+                  - name: envoy.filters.http.local_ratelimit
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit
+                      stat_prefix: edge_local_rate_limiter
+                      token_bucket:
+                        max_tokens: 200
+                        tokens_per_fill: 200
+                        fill_interval: 1s
+                      filter_enabled:
+                        runtime_key: local_rate_limit_enabled
+                        default_value: { numerator: 100, denominator: HUNDRED }
+                      filter_enforced:
+                        runtime_key: local_rate_limit_enforced
+                        default_value: { numerator: 100, denominator: HUNDRED }
+                      response_headers_to_add:
+                        - append_action: OVERWRITE_IF_EXISTS_OR_ADD
+                          header: { key: x-local-rate-limit, value: "true" }
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+                route_config:
+                  name: edge_routes
+                  virtual_hosts:
+                    - name: agno_platform_core
+                      domains: ["*"]
+                      routes:
+                        - match: { prefix: "/" }
+                          route:
+                            cluster: agno_platform_core_http
+                            timeout: 30s
+
+    - name: internal_grpc_listener
+      address:
+        socket_address: { address: 0.0.0.0, port_value: 8081 }
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: agno_internal_grpc
+                codec_type: AUTO
+                access_log:
+                  - name: envoy.access_loggers.stdout
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog
+                http_filters:
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+                route_config:
+                  name: internal_grpc_routes
+                  virtual_hosts:
+                    - name: agno_platform_core_grpc
+                      domains: ["*"]
+                      routes:
+                        - match: { prefix: "/" }
+                          route:
+                            cluster: agno_platform_core_grpc
+                            timeout: 60s
+
+  clusters:
+    - name: agno_platform_core_http
+      connect_timeout: 2s
+      type: STRICT_DNS
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: agno_platform_core_http
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    # host.docker.internal: this app runs on the host (`npm
+                    # run start:dev`, per the README), not as a
+                    # docker-compose service - Envoy here reaches it the
+                    # same way any other container reaches the host, per
+                    # Docker Desktop's documented alias. A real deployment
+                    # points this at that environment's actual service
+                    # address/mesh endpoint instead.
+                    socket_address: { address: host.docker.internal, port_value: 3000 }
+
+    - name: agno_platform_core_grpc
+      connect_timeout: 2s
+      type: STRICT_DNS
+      lb_policy: ROUND_ROBIN
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          explicit_http_config:
+            http2_protocol_options: {}
+      load_assignment:
+        cluster_name: agno_platform_core_grpc
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address: { address: host.docker.internal, port_value: 5000 }
+
+admin:
+  address:
+    socket_address: { address: 0.0.0.0, port_value: 9901 }

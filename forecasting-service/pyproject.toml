@@ -1,0 +1,117 @@
+[project]
+name = "agno-wfm-forecasting"
+version = "0.1.0"
+description = "AGNO WFM Module 03 - Forecasting Engine"
+requires-python = ">=3.11"
+license = { text = "UNLICENSED" }
+dependencies = [
+    "fastapi>=0.115,<0.116",
+    "uvicorn[standard]>=0.32,<0.33",
+    "sqlalchemy[asyncio]>=2.0,<2.1",
+    "asyncpg>=0.30,<0.32",
+    "alembic>=1.14,<1.15",
+    "psycopg2-binary>=2.9,<3.0",
+    "pydantic>=2.9,<3.0",
+    "pydantic-settings>=2.6,<3.0",
+    # GAP-08 fix (enterprise readiness audit, 2026-08-18): real JWT
+    # verification against the root platform-core service's JWKS, replacing
+    # the raw X-Tenant-Id/X-Actor-Id header trust every Node service in
+    # this platform already moved past. PyJWKClient handles JWKS
+    # fetch/cache; `[crypto]` pulls in `cryptography` for RS256.
+    "pyjwt[crypto]>=2.9,<3.0",
+    "nats-py>=2.9,<3.0",
+    # Phase 3 (docs/adr/0021). Python 3.11/3.12 only - `ray` has no Python
+    # 3.14 wheel at all, and `mlflow`'s `pyarrow` dependency needs a C++
+    # toolchain to build from source on 3.14. Fully installable and verified
+    # (including a real Ray cluster + real MLflow tracking store) on 3.12;
+    # see the Phase 3 production readiness checklist.
+    "statsmodels>=0.14,<0.15",
+    "prophet>=1.1,<2.0",
+    "pandas>=2.1,<2.3",
+    "numpy>=1.26,<2.0",
+    "ray[default]>=2.9,<3.0",
+    "mlflow>=2.17,<3.0",
+    # Phase 4 (docs/adr/0022).
+    "lightgbm>=4.5,<5.0",
+    # Phase 8 (docs/adr/0026). CPU wheel installs/runs fine here (this
+    # sandbox has no GPU - `torch.cuda.is_available()` is `False`); GPU
+    # dispatch is a Ray resource request (`TFT_NUM_GPUS`), not a different
+    # torch build.
+    "torch>=2.4,<3.0",
+    "pytorch-forecasting>=1.0,<2.0",
+    "lightning>=2.4,<3.0",
+    "prometheus-client>=0.21,<0.22",
+    # Phase 6 (ADR-0059) - this service's first gRPC surface,
+    # ForecastService.GetForecastRequirements.
+    "grpcio>=1.60,<2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3,<9.0",
+    "pytest-asyncio>=0.24,<0.25",
+    "httpx>=0.27,<0.28",
+    "ruff>=0.7,<0.8",
+    "mypy>=1.13,<2.0",
+    "grpcio-tools>=1.60,<2.0",
+    "types-protobuf>=5.0,<6.0",
+    "types-grpcio>=1.0,<2.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+# grpc_tools.protoc-generated code (Phase 6, ADR-0059) - not hand-written,
+# not worth lint-fixing on every regeneration.
+extend-exclude = ["app/grpc/generated"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+# B008 flags `Depends(...)` in a default argument, which is FastAPI's own
+# idiomatic dependency-injection pattern, not a real "mutable default" bug.
+ignore = ["B008"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+disallow_untyped_defs = true
+
+[[tool.mypy.overrides]]
+# nats-py, asyncpg, statsmodels, prophet, and lightgbm ship no inline
+# types/py.typed marker.
+module = [
+    "nats.*",
+    "asyncpg.*",
+    "statsmodels.*",
+    "prophet.*",
+    "ray.*",
+    "mlflow.*",
+    "pandas.*",
+    "lightgbm.*",
+    "torch.*",
+    "pytorch_forecasting.*",
+    "lightning.*",
+]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# grpc_tools.protoc-generated code (Phase 6, ADR-0059) - `*_pb2_grpc.py`
+# builds its servicer/stub classes dynamically at runtime (no static
+# `GetForecastRequirements` attribute for mypy to see on the module-level
+# `Servicer`/`Stub` base classes it generates), and the plain
+# `*_pb2.py`/`.pyi` pair's message classes don't type-check cleanly under
+# `strict` either. Not hand-written, not worth fighting mypy over on every
+# regeneration.
+module = ["app.grpc.generated.*"]
+ignore_errors = true

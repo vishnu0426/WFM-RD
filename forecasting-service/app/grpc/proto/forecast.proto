@@ -1,0 +1,58 @@
+syntax = "proto3";
+
+// Phase 6 (ADR-0059): ForecastService - Scheduling's mid-solve pull for
+// coverage requirements, the Python-side counterpart to Module 01/02's
+// EmployeeService/PolicyService (src/grpc/proto/employee.proto,
+// policy.proto). Keyed by forecast_run_id directly - every ScheduleJob
+// already carries one (§2.1), so there is no "which run did the caller
+// mean" ambiguity the way an org_unit_id/date-range lookup would invite.
+//
+// Unary, not server-streaming like agno.org.v1.EmployeeService.
+// GetSchedulableEmployees: unlike an org unit's employee count (unbounded,
+// 100k+ scale per §0.5), a single ScheduleJob's own date range bounds the
+// interval count to a realistic scheduling horizon (days to a few weeks at
+// typical interval granularity) - genuinely large enough that a bulk
+// upfront payload wasn't right for Employees, but not for this. Unary also
+// lets the found/not-found distinction (agno.core.v1.PolicyResponse's own
+// pattern) live cleanly as one response field, rather than as an awkward
+// sentinel on an otherwise-empty stream.
+//
+// Regenerate stubs after editing this file (then reapply the `from . import`
+// fix atop the plain `import forecast_pb2` line grpc_tools.protoc always
+// emits in forecast_pb2_grpc.py - it assumes the generated dir is on
+// sys.path directly, which it isn't here):
+//   .venv/bin/python -m grpc_tools.protoc -I app/grpc/proto \
+//     --python_out=app/grpc/generated --grpc_python_out=app/grpc/generated \
+//     --pyi_out=app/grpc/generated app/grpc/proto/forecast.proto
+package agno.forecasting.v1;
+
+service ForecastService {
+  rpc GetForecastRequirements(GetForecastRequirementsRequest) returns (GetForecastRequirementsResponse);
+}
+
+message GetForecastRequirementsRequest {
+  string tenant_id = 1;
+  string forecast_run_id = 2;
+}
+
+message GetForecastRequirementsResponse {
+  // false when forecast_run_id doesn't exist, belongs to a different
+  // tenant, or isn't status: completed yet - a scheduling job pulling
+  // requirements from a still-running/failed forecast is a caller error to
+  // surface clearly, not data to guess at from a partial run.
+  bool found = 1;
+  repeated ForecastRequirement requirements = 2;
+}
+
+message ForecastRequirement {
+  string interval_start = 1; // RFC 3339
+  int32 interval_minutes = 2;
+  // Decimal-as-string (matching Policy.definition_json's own "don't lose
+  // precision over the wire" reasoning) - required_headcount is
+  // NUMERIC(10,2) in Postgres, and proto3 has no native decimal type.
+  // Absent (empty string) for an interval whose required_headcount is
+  // NULL (headcount_service.compute_required_headcount's own "can't
+  // compute, not zero" outcome - see its docstring) - never coerced to
+  // "0", which would silently understate the actual requirement.
+  string required_headcount = 3;
+}

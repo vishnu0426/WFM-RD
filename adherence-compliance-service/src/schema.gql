@@ -1,0 +1,81 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+type AdherenceScore {
+  adherencePct: Float!
+  adherentSeconds: Int!
+  computedAt: DateTime!
+  employeeId: ID!
+  majorDeviationCount: Int!
+  periodEnd: DateTime!
+  periodStart: DateTime!
+  totalScheduledSeconds: Int!
+}
+
+type ComplianceRule {
+  activatedAt: DateTime
+  activationDelayUntil: DateTime
+  citation: String!
+  createdAt: DateTime!
+  definition: JSON!
+  effectiveFrom: String!
+  effectiveTo: String
+  id: ID!
+  isPlatformDefault: Boolean!
+  jurisdiction: String!
+  ruleType: ComplianceRuleType!
+  status: String!
+  version: Int!
+}
+
+"""
+§2.1's fixed rule-type vocabulary - the same enum this module's schema CHECK constraint enforces.
+"""
+enum ComplianceRuleType {
+  BREAK_REQUIREMENT
+  MAX_CONSECUTIVE_DAYS
+  OVERTIME_THRESHOLD
+  REST_PERIOD_MINIMUM
+  UNION_RULE
+}
+
+input CreateComplianceRuleInput {
+  citation: String!
+  definition: JSON!
+  effectiveFrom: String!
+  effectiveTo: String
+  jurisdiction: String!
+  ruleType: ComplianceRuleType!
+}
+
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
+
+"""
+Arbitrary JSON value (object, array, string, number, boolean, or null).
+"""
+scalar JSON
+
+type Mutation {
+  activateComplianceRule(effectiveAt: DateTime, justificationNote: String, ruleId: ID!): ComplianceRule!
+  createComplianceRule(input: CreateComplianceRuleInput!): ComplianceRule!
+  generateRuleChangeImpactPreview(orgUnitIds: [ID!]!, ruleId: ID!): RuleChangeImpactPreview!
+}
+
+type Query {
+  adherenceScoreToday(employeeId: ID!): AdherenceScore
+  complianceRules(jurisdiction: String!): [ComplianceRule!]!
+}
+
+type RuleChangeImpactPreview {
+  affectedEmployeeIds: [ID!]!
+  affectedOrgUnitIds: [ID!]!
+  complianceRuleId: ID!
+  generatedAt: DateTime!
+  id: ID!
+  simulatedAgainstScheduleIds: [ID!]!
+  wouldBecomeNoncompliantCount: Int!
+}

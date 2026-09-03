@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "declaration": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "ES2021",
+    "sourceMap": true,
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "incremental": true,
+    "skipLibCheck": true,
+    "strictNullChecks": true,
+    "noImplicitAny": true,
+    "strictBindCallApply": true,
+    "forceConsistentCasingInFileNames": true,
+    "noFallthroughCasesInSwitch": true,
+    "paths": {
+      "@app/*": ["src/*"]
+    }
+  },
+  // Without an explicit include, tsc's default ("all files under this
+  // config's directory") sweeps in every sibling service directory
+  // (shift-marketplace-service, mobile-app, etc.) too - they only look
+  // clean today by accident (plain-TS/no-JSX code resolving against their
+  // own local node_modules), and mobile-app's JSX + path aliases surfaced
+  // the gap for real. Scope this project to what it actually owns.
+  "include": ["src/**/*", "test/**/*", "scripts/**/*"]
+}

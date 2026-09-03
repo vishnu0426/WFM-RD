@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+// Module 08 Phase 5 (docs/adr/0103): `RuleChangeImpactPreview`'s simulation
+// needs "every currently-published shift assignment for a set of
+// employees" in bulk - the only existing read contract for this data,
+// `GET /v1/scheduling/employees/{employeeId}/shift-assignments`
+// (docs/adr/0064), is single-employee REST, and there is no precedent
+// anywhere in this platform for a Node service calling another service's
+// REST API (every cross-service call in this platform, in either
+// direction, is gRPC). Rather than N sequential REST calls from Node, this
+// adds a second gRPC server surface here (this service's first was
+// `scheduling_eligibility.proto`, ADR-0082) - same "reuse the owning
+// service's own read path" posture, generalized to a bulk employee-id
+// filter.
+package agno.scheduling.v1;
+
+service ScheduleQueryService {
+  // Server-streaming, same "don't buffer an unbounded response" rationale
+  // as employee.proto's GetSchedulableEmployees - an impact preview across
+  // a whole org unit's roster and a multi-week window can be a lot of
+  // rows. Ordered by employee_id then shift_start (schedule_service.py's
+  // own query ordering) so the caller can group consecutive messages per
+  // employee without buffering the whole stream first.
+  rpc ListPublishedShiftAssignments(ListPublishedShiftAssignmentsRequest)
+      returns (stream ShiftAssignmentRecord);
+}
+
+message ListPublishedShiftAssignmentsRequest {
+  string tenant_id = 1;
+  repeated string employee_ids = 2;
+  // RFC 3339 timestamps - half-open window [window_start, window_end),
+  // same convention as the REST endpoint's `from`/`to` query params.
+  string window_start = 3;
+  string window_end = 4;
+}
+
+message ShiftAssignmentRecord {
+  string employee_id = 1;
+  // Needed so the caller can populate `RuleChangeImpactPreview.simulated_against_schedule_ids`
+  // without a second lookup.
+  string schedule_id = 2;
+  string shift_start = 3;
+  string shift_end = 4;
+  bool is_overtime = 5;
+}

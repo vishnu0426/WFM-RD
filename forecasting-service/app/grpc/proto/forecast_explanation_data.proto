@@ -1,0 +1,67 @@
+syntax = "proto3";
+
+// Module 10 Phase 4 (docs/adr/0119): `explainForecast(forecastRunId)`'s
+// data source - a new gRPC surface added to forecasting-service itself,
+// same "the owning service builds the missing read contract" posture as
+// ADR-0059's ForecastService.GetForecastRequirements and ADR-0115's
+// ScheduleExplanationDataService. `ForecastService.GetForecastRequirements`
+// (forecast.proto) serves per-interval headcount only - nothing joins a
+// ForecastRun to its ForecastModel/ForecastAccuracyLog, which is exactly
+// what an explanation of "how good is this forecast, and why" needs.
+//
+// Regenerate stubs after editing this file (then reapply the `from . import`
+// fix atop the plain `import forecast_explanation_data_pb2` line
+// grpc_tools.protoc always emits):
+//   .venv/bin/python -m grpc_tools.protoc -I app/grpc/proto \
+//     --python_out=app/grpc/generated --grpc_python_out=app/grpc/generated \
+//     --pyi_out=app/grpc/generated app/grpc/proto/forecast_explanation_data.proto
+package agno.forecasting.v1;
+
+service ForecastExplanationDataService {
+  rpc GetForecastRunForExplanation(GetForecastRunForExplanationRequest)
+      returns (GetForecastRunForExplanationResponse);
+}
+
+message GetForecastRunForExplanationRequest {
+  string tenant_id = 1;
+  string forecast_run_id = 2;
+}
+
+message GetForecastRunForExplanationResponse {
+  // false when forecast_run_id doesn't exist or belongs to a different
+  // tenant - a caller error to surface clearly, never data to guess at.
+  bool found = 1;
+  // Echoed from the persisted row - Module 10's §5.1 tenant-scoping
+  // assertion compares this against the requesting user's own bound
+  // tenant (ADR-0115's precedent).
+  string tenant_id = 2;
+  string org_unit_id = 3;
+  // queued | running | completed | failed
+  string status = 4;
+  string date_range_start = 5; // RFC 3339 date
+  string date_range_end = 6;   // RFC 3339 date
+  int32 interval_minutes = 7;
+  bool is_cold_start = 8;
+  string completed_at = 9; // RFC 3339 timestamp, empty if NULL
+
+  // The model that produced this run - empty strings/false when no model
+  // is linked (forecast_model_id is nullable) rather than a synthetic
+  // "unknown model" row.
+  bool has_model = 10;
+  string model_type = 11;
+  string model_status = 12;
+  // Decimal-as-string (proto3 has no native decimal type) - empty when NULL.
+  string backtest_mape = 13;
+  string backtest_wfa = 14;
+  bool minimum_data_volume_met = 15;
+
+  repeated ForecastAccuracyEntry accuracy_log = 16;
+}
+
+message ForecastAccuracyEntry {
+  string evaluated_at = 1; // RFC 3339
+  string actual_volume = 2;
+  string predicted_volume = 3;
+  string mape = 4;  // empty if NULL
+  string bias = 5;  // empty if NULL
+}

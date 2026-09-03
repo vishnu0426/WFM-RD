@@ -1,0 +1,1 @@
+export const REDIS_CLIENT = Symbol('INTRADAY_REDIS_CLIENT');

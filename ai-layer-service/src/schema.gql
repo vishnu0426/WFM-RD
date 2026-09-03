@@ -1,0 +1,284 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+"""
+A tenant's own autonomy-level configuration for one action_type (§3), resolved by three-tier order (exact match -> tenant's own 'default' row -> the platform default suggest_only) whenever a recommendation is created.
+"""
+type AIGovernancePolicy {
+  """
+  e.g. "reallocation", or the "default" sentinel for this tenant's own broader/category-level row (ADR-0114).
+  """
+  actionType: String!
+
+  """
+  suggest_only / approve_required / auto_execute_low_risk - never a more permissive level than what was explicitly configured.
+  """
+  autonomyLevel: AiAutonomyLevel!
+
+  """
+  Only evaluated when autonomyLevel is auto_execute_low_risk: maxAffectedEmployees/minConfidenceIndicator are the only two real, evaluated criteria (ADR-0124).
+  """
+  riskThresholdConfig: JSON!
+  updatedAt: DateTime!
+}
+
+"""
+One version of an AIGovernancePolicy, written by a database trigger on every real autonomy_level/risk_threshold_config change - never by application code (ADR-0132, SCD Type 2). Newest first; validTo: null marks the currently active version.
+"""
+type AIGovernancePolicyHistoryEntry {
+  actionType: String!
+  autonomyLevel: AiAutonomyLevel!
+  riskThresholdConfig: JSON!
+
+  """
+  The user who made this change, from the verified access token's own sub claim.
+  """
+  updatedBy: ID
+
+  """When this version became active."""
+  validFrom: DateTime!
+
+  """
+  When this version was superseded - null for the currently active version.
+  """
+  validTo: DateTime
+}
+
+"""
+One record of the query router translating real structured data into a natural-language explanation or answer (§2.1). Produced by explainSchedule/explainForecast/explainReallocation/rootCauseAnalysis/askQuestion - never mutated after creation.
+"""
+type AIInteraction {
+  """
+  0-1, half self-reported by the model and half a mechanical groundedness check against the real input data (§0.5). Null when degradedMode is true.
+  """
+  confidenceIndicator: Float
+
+  """When this interaction was generated."""
+  createdAt: DateTime!
+
+  """
+  True when the LLM call failed or no provider is configured - outputText/confidenceIndicator are null in that case (§4).
+  """
+  degradedMode: Boolean!
+
+  """
+  Stable identifier for this interaction, referenced by createReallocationRecommendation.
+  """
+  id: ID!
+
+  """Which query-router operation produced this interaction."""
+  interactionType: AiInteractionType!
+
+  """
+  Provider and model identifier plus prompt-template version, e.g. "anthropic:claude-...@schedule-explanation-v1".
+  """
+  modelUsed: String!
+
+  """
+  The model's natural-language output. Null when degradedMode is true - never a fabricated summary.
+  """
+  outputText: String
+
+  """
+  Structured JSON the model produced alongside outputText (topConstraints/tradeOffs) - null when degradedMode is true.
+  """
+  supportingData: JSON
+}
+
+"""
+An AI-generated recommendation subject to §3 governance (autonomy-level resolution + risk-threshold evaluation) - never executed without going through decideRecommendation, unless auto_execute_low_risk already cleared it at creation time.
+"""
+type AIRecommendation {
+  """The AIInteraction this recommendation was created from."""
+  aiInteractionId: ID!
+  createdAt: DateTime!
+
+  """Null while status is still "suggested"."""
+  decidedAt: DateTime
+
+  """
+  The deciding user's id (from the verified access token), or null for a system/auto-executed decision.
+  """
+  decidedBy: ID
+  id: ID!
+
+  """
+  Null for every reallocation-sourced recommendation today - ReallocationAction has no org_unit_id column (a disclosed limitation, ADR-0122).
+  """
+  orgUnitId: ID
+
+  """
+  The generating AIInteraction's own outputText, stored verbatim - not sanitized, not fact-checked beyond suspiciousLanguageFlags (see that field's own description).
+  """
+  rationaleText: String!
+
+  """
+  e.g. "reallocation" - the only recommendation_type with a real execution pathway wired (ADR-0123).
+  """
+  recommendationType: String!
+
+  """
+  True unless autonomy_level resolved to auto_execute_low_risk AND every risk threshold (including suspiciousLanguageFlags) passed.
+  """
+  requiresHumanApproval: Boolean!
+
+  """Which owning module this recommendation acts on."""
+  sourceModule: AiRecommendationSourceModule!
+
+  """
+  suggested (awaiting a human decision) / approved / rejected / auto_executed.
+  """
+  status: AiRecommendationStatus!
+
+  """
+  A copy of the generating AIInteraction.inputContext - the real structured data this recommendation is grounded in.
+  """
+  supportingData: JSON!
+
+  """
+  A disclosed, incomplete heuristic (ADR-0131/0133) - empty does NOT mean rationaleText is trustworthy, only that no known suspicious phrase pattern (e.g. "already approved", "no review needed") matched. A non-empty array already forced requiresHumanApproval to true if it was not already.
+  """
+  suspiciousLanguageFlags: [String!]!
+}
+
+"""
+§3's fixed autonomy-level vocabulary - the same enum this module's schema CHECK constraint enforces.
+"""
+enum AiAutonomyLevel {
+  APPROVE_REQUIRED
+  AUTO_EXECUTE_LOW_RISK
+  SUGGEST_ONLY
+}
+
+"""
+§2.1's fixed interaction-type vocabulary - the same enum this module's schema CHECK constraint enforces.
+"""
+enum AiInteractionType {
+  ANALYTICS_NL_BRIDGE
+  FORECAST_EXPLANATION
+  NL_QUERY
+  REALLOCATION_RATIONALE
+  ROOT_CAUSE_ANALYSIS
+  SCHEDULE_EXPLANATION
+}
+
+"""
+docs/adr/0117's BYOK provider vocabulary - the same enum this module's schema CHECK constraint enforces.
+"""
+enum AiLlmProvider {
+  ANTHROPIC
+  GEMINI
+  OLLAMA
+  OPENAI
+}
+
+"""
+One version of an AiProviderConfig, written by a database trigger on every configure() call - never by application code (ADR-0132, SCD Type 2). Versions on EVERY update, not just a tracked-column change, since the encrypted key's random IV makes 'did the key actually change' unobservable by comparing columns. The key itself is never copied into this history at all.
+"""
+type AiProviderConfigHistoryEntry {
+  baseUrl: String
+  model: String!
+  provider: AiLlmProvider!
+
+  """
+  The user who made this change, from the verified access token's own sub claim.
+  """
+  updatedBy: ID
+
+  """When this version became active."""
+  validFrom: DateTime!
+
+  """
+  When this version was superseded - null for the currently active version.
+  """
+  validTo: DateTime
+}
+
+"""
+A tenant's own BYOK LLM provider configuration - never includes the API key, which is write-only after creation (the oauth_clients signing-secret precedent, ADR-0046).
+"""
+type AiProviderConfigSummary {
+  """
+  Only ever non-null for ollama - a self-hosted provider has no fixed platform endpoint (ADR-0129). Not a secret, safe to echo back.
+  """
+  baseUrl: String
+
+  """
+  The tenant's own configured model identifier, used verbatim - never hardcoded by this service.
+  """
+  model: String!
+
+  """
+  anthropic / openai / gemini (cloud, apiKey required) or ollama (self-hosted, baseUrl required instead).
+  """
+  provider: AiLlmProvider!
+  updatedAt: DateTime!
+}
+
+"""
+`decideRecommendation`'s own input vocabulary - a human can only approve or reject, never mark something auto_executed.
+"""
+enum AiRecommendationDecision {
+  APPROVED
+  REJECTED
+}
+
+"""
+§2.1's fixed source-module vocabulary - the same enum this module's schema CHECK constraint enforces.
+"""
+enum AiRecommendationSourceModule {
+  FORECASTING
+  INTRADAY
+  SCHEDULING
+}
+
+"""
+§2.1's fixed status vocabulary - the same enum this module's schema CHECK constraint enforces.
+"""
+enum AiRecommendationStatus {
+  APPROVED
+  AUTO_EXECUTED
+  REJECTED
+  SUGGESTED
+}
+
+input AskQuestionContextInput {
+  forecastRunId: ID
+  orgUnitId: ID
+  periodEnd: DateTime
+  periodStart: DateTime
+  reallocationActionId: ID
+  scheduleJobId: ID
+}
+
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
+
+"""
+Arbitrary JSON value (object, array, string, number, boolean, or null).
+"""
+scalar JSON
+
+type Mutation {
+  configureAiProvider(apiKey: String, baseUrl: String, model: String!, provider: AiLlmProvider!): AiProviderConfigSummary!
+  createReallocationRecommendation(aiInteractionId: ID!): AIRecommendation!
+  decideRecommendation(decision: AiRecommendationDecision!, recommendationId: ID!): AIRecommendation!
+  updateGovernancePolicy(actionType: String!, autonomyLevel: AiAutonomyLevel!, riskThresholdConfig: JSON): AIGovernancePolicy!
+}
+
+type Query {
+  aiGovernancePolicyHistory(actionType: String!): [AIGovernancePolicyHistoryEntry!]!
+  aiInteractions(interactionType: AiInteractionType, limit: Int, offset: Int): [AIInteraction!]!
+  aiProviderConfig: AiProviderConfigSummary
+  aiProviderConfigHistory: [AiProviderConfigHistoryEntry!]!
+  aiRecommendations(limit: Int, offset: Int, orgUnitId: ID, sourceModule: AiRecommendationSourceModule, status: AiRecommendationStatus): [AIRecommendation!]!
+  askQuestion(context: AskQuestionContextInput!, question: String!): AIInteraction!
+  explainForecast(forecastRunId: ID!): AIInteraction!
+  explainReallocation(reallocationActionId: ID!): AIInteraction!
+  explainSchedule(scheduleId: ID!): AIInteraction!
+  pendingRecommendations(orgUnitId: ID): [AIRecommendation!]!
+  rootCauseAnalysis(orgUnitId: ID!, periodEnd: DateTime!, periodStart: DateTime!): AIInteraction!
+}

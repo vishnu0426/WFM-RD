@@ -1,0 +1,12 @@
+{
+  "rootDir": "..",
+  "testEnvironment": "node",
+  "testRegex": "test/integration/.*\\.spec\\.ts$",
+  "transform": {
+    "^.+\\.ts$": "ts-jest",
+    "/node_modules/.+\\.js$": "babel-jest"
+  },
+  "transformIgnorePatterns": ["/node_modules/(?!(uuid|@nestjs|@apollo|jose|openid-client)/)"],
+  "moduleFileExtensions": ["js", "json", "ts"],
+  "testTimeout": 30000
+}

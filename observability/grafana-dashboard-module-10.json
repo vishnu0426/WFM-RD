@@ -1,0 +1,183 @@
+{
+  "title": "AGNO WFM — Module 10 AI Layer (Phase 8 Dashboard)",
+  "uid": "agno-wfm-module-10",
+  "schemaVersion": 39,
+  "timezone": "browser",
+  "time": { "from": "now-1h", "to": "now" },
+  "refresh": "30s",
+  "tags": ["agno-wfm", "module-10", "ai-layer"],
+  "panels": [
+    {
+      "type": "row",
+      "title": "AI interaction volume & latency (§0.5) — by interaction_type",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100
+    },
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "ai_interaction_duration_seconds — p50/p95/p99 by interaction_type (full round trip: gRPC fan-out + LLM call)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "s", "custom": { "drawStyle": "line" } }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(ai_interaction_duration_seconds_bucket[5m])) by (le, interaction_type))",
+          "legendFormat": "p50 {{interaction_type}}"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(ai_interaction_duration_seconds_bucket[5m])) by (le, interaction_type))",
+          "legendFormat": "p95 {{interaction_type}}"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(ai_interaction_duration_seconds_bucket[5m])) by (le, interaction_type))",
+          "legendFormat": "p99 {{interaction_type}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "ai_interactions_total — rate by interaction_type (FinOps volume signal, §0.5)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "sum(rate(ai_interactions_total[5m])) by (interaction_type)",
+          "legendFormat": "{{interaction_type}}"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "LLM API health & circuit breaker (Phase 7/docs/adr/0128, BYOK multi-provider docs/adr/0117/0129)",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 },
+      "id": 101
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "ai_llm_api_calls_total — rate by result (success/error/timeout/short_circuited)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 10 },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum(rate(ai_llm_api_calls_total[5m])) by (result)", "legendFormat": "{{result}}" }
+      ],
+      "options": {},
+      "description": "A rising `short_circuited` share means the breaker is protecting the system from an already-detected outage, not that the provider is newly failing - see MetricsService's own doc comment. Not split by provider (anthropic/openai/gemini/ollama) - this metric has no provider label (docs/adr/0128's own considered-and-skipped third label dimension); provider-specific breakdown is only visible in application logs."
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "ai_circuit_breaker_state_transitions_total — rate by to_state",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 10 },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum(rate(ai_circuit_breaker_state_transitions_total[5m])) by (to_state)", "legendFormat": "{{to_state}}" }
+      ],
+      "description": "Any sustained `open` rate with no matching `closed` shortly after is the on-call page condition: a provider (anthropic/openai/gemini/ollama - not distinguished by this metric) has been failing long enough to trip the breaker and isn't recovering."
+    },
+    {
+      "type": "row",
+      "title": "Degraded mode & tenant-scoping security (§4 / §5.1)",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 18 },
+      "id": 102
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "ai_degraded_mode_interactions_total — rate by interaction_type",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 19 },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum(rate(ai_degraded_mode_interactions_total[5m])) by (interaction_type)", "legendFormat": "{{interaction_type}}" }
+      ],
+      "description": "`nl_query` (askQuestion, Phase 6/docs/adr/0127) never appears as a *served* degraded interaction here in the usual sense - it throws AiAssistantUnavailableError to the caller instead of returning a degraded response, but the row is still recorded and still counted here."
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "ai_tenant_scope_assertion_failures_total — rate by source_module (§5.1, a security-relevant event)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 19 },
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "color": { "mode": "fixed", "fixedColor": "red" } },
+        "overrides": []
+      },
+      "targets": [
+        { "expr": "sum(rate(ai_tenant_scope_assertion_failures_total[5m])) by (source_module)", "legendFormat": "{{source_module}}" }
+      ],
+      "description": "§0.5's on-call table: any non-zero rate here is worth alerting on immediately, not trending - it means a gRPC response returned data scoped to a different tenant than the one that asked (docs/adr/0118, durable-audit-backed)."
+    },
+    {
+      "type": "row",
+      "title": "Governance & recommendations (§3, Phase 5/docs/adr/0123/0124)",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 27 },
+      "id": 103
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "ai_recommendations_by_autonomy_level_total — rate by autonomy_level, all tenants",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 28 },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum(rate(ai_recommendations_by_autonomy_level_total[5m])) by (autonomy_level)", "legendFormat": "{{autonomy_level}}" }
+      ],
+      "description": "A sudden shift toward `auto_execute_low_risk` worth a human glance - it means non-negotiable #1's write-back pathway (ADR-0124) is firing without a human decision more often, not necessarily a problem, but the one autonomy level where this dashboard's own volume trend is most worth watching."
+    },
+    {
+      "type": "row",
+      "title": "Platform health",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 36 },
+      "id": 104
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "HTTP/GraphQL request duration — p99 by route (Query.<field>/Mutation.<field> for GraphQL)",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 37 },
+      "fieldConfig": { "defaults": { "unit": "s", "custom": { "drawStyle": "line" } }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, route))",
+          "legendFormat": "{{route}}"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Process resident memory",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 45 },
+      "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] },
+      "targets": [
+        { "expr": "process_resident_memory_bytes{job=\"agno-wfm-ai-layer-service\"}", "legendFormat": "RSS" }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Node.js event loop lag (p99)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 45 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [
+        { "expr": "nodejs_eventloop_lag_p99_seconds{job=\"agno-wfm-ai-layer-service\"}", "legendFormat": "p99 lag" }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Known observability gaps",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 53 },
+      "id": 105
+    },
+    {
+      "id": 11,
+      "type": "text",
+      "title": "Disclosed gaps as of Phase 8",
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 54 },
+      "options": {
+        "mode": "markdown",
+        "content": "**RBAC guard rejections (401/403) are invisible to every panel above.** Phase 8's `AccessTokenGuard`/`PermissionsGuard` (docs/adr/0130) run as NestJS Guards, which execute *before* `HttpMetricsInterceptor` in the request lifecycle (Guards → Interceptors → Handler) - a request a guard rejects never reaches the interceptor that records `http_requests_total`/`http_request_duration_seconds` at all. There is currently no metric anywhere that counts RBAC denials; the only record of one is the GraphQL error response itself and, if logging is scraped, the stack trace NestJS's default exception handling logs. A real gap for a security-relevant control, disclosed here rather than silently assumed covered by the general HTTP metrics.\n\n**No metric distinguishes which BYOK provider (anthropic/openai/gemini/ollama) is failing.** `ai_llm_api_calls_total`/`ai_circuit_breaker_state_transitions_total` are both provider-agnostic by design (docs/adr/0128's own considered-and-skipped third label dimension, given only two providers existed when that decision was made - now four). Diagnosing *which* provider is behind a circuit-open alert currently requires reading application logs, not this dashboard.\n\n**No Prometheus alerting rule exists for any panel on this dashboard** - confirmed platform-wide, not a Module 10-specific gap (ADR-0107's own precedent finding for Module 08).\n\n**This dashboard reflects one process's own in-memory circuit-breaker state** (docs/adr/0128) - a future multi-replica deployment would need per-instance breakdown (or a shared state store) to be meaningful, since `ai_circuit_breaker_state_transitions_total` aggregated across replicas could show `open` and `closed` simultaneously from different instances."
+      }
+    }
+  ]
+}

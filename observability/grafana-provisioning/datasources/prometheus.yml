@@ -1,0 +1,12 @@
+# Auto-provisions Prometheus as Grafana's default datasource on container
+# start - so `docker-compose up -d grafana` gives a working dashboard with
+# no manual click-through setup.
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: true

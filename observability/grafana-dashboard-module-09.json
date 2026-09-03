@@ -1,0 +1,175 @@
+{
+  "title": "AGNO WFM — Module 09 Analytics & Reporting (Phase 8 SLO Dashboard)",
+  "uid": "agno-wfm-module-09",
+  "schemaVersion": 39,
+  "timezone": "browser",
+  "time": { "from": "now-1h", "to": "now" },
+  "refresh": "30s",
+  "tags": ["agno-wfm", "module-09", "analytics-reporting"],
+  "panels": [
+    {
+      "type": "row",
+      "title": "Materialized-view freshness (§0.5) — refresh lag/runs per view",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100
+    },
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "analytics_mv_refresh_lag_seconds by view_name (seconds past documented cadence)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "s", "custom": { "drawStyle": "line" } }, "overrides": [] },
+      "targets": [
+        { "expr": "analytics_mv_refresh_lag_seconds", "legendFormat": "{{view_name}}" }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "analytics_mv_refresh_job_runs_total by view_name/result",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum(rate(analytics_mv_refresh_job_runs_total[5m])) by (view_name, result)", "legendFormat": "{{view_name}} - {{result}}" }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Read-replica health (§0.5/ADR-0108) and consistency-check (§2.3 rule 4/ADR-0112)",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 },
+      "id": 101
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "analytics_replica_lag_seconds",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 10 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [
+        { "expr": "analytics_replica_lag_seconds", "legendFormat": "replica lag" }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "analytics_consistency_check_discrepancies_total by view_name — a real alerting condition, not a silent discrepancy",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 10 },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum(rate(analytics_consistency_check_discrepancies_total[1h])) by (view_name)", "legendFormat": "{{view_name}}" }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Query engine (§4.1/§0.5) — metricQuery/executiveSummary/BI-connector reads by cost tier",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 18 },
+      "id": 102
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "analytics_metric_queries_total by cost_tier/result",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 19 },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum(rate(analytics_metric_queries_total[5m])) by (cost_tier, result)", "legendFormat": "{{cost_tier}} - {{result}}" }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "analytics_metric_definition_validations_total by result/cost_tier (createMetricDefinition's dry-run gate, ADR-0110)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 19 },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum(rate(analytics_metric_definition_validations_total[5m])) by (result, cost_tier)", "legendFormat": "{{result}} - {{cost_tier}}" }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Async exports (§4.2/Phase 6)",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 27 },
+      "id": 103
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "analytics_exports_total by result",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 28 },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum(rate(analytics_exports_total[5m])) by (result)", "legendFormat": "{{result}}" }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "HTTP/GraphQL surface",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 36 },
+      "id": 104
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "http_request_duration_seconds — p50/p95/p99 by route",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 37 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket{job=\"agno-wfm-analytics-reporting-service\"}[5m])) by (le, route))", "legendFormat": "p50 {{route}}" },
+        { "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=\"agno-wfm-analytics-reporting-service\"}[5m])) by (le, route))", "legendFormat": "p95 {{route}}" },
+        { "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{job=\"agno-wfm-analytics-reporting-service\"}[5m])) by (le, route))", "legendFormat": "p99 {{route}}" }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "http_requests_total by route/status_code",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 37 },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum(rate(http_requests_total{job=\"agno-wfm-analytics-reporting-service\"}[5m])) by (route, status_code)", "legendFormat": "{{route}} {{status_code}}" }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Process & platform health",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 45 },
+      "id": 105
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Process resident memory",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 46 },
+      "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] },
+      "targets": [
+        { "expr": "process_resident_memory_bytes{job=\"agno-wfm-analytics-reporting-service\"}", "legendFormat": "RSS" }
+      ]
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Node.js event loop lag (p99)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 46 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [
+        { "expr": "nodejs_eventloop_lag_p99_seconds{job=\"agno-wfm-analytics-reporting-service\"}", "legendFormat": "p99 lag" }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Known observability gaps",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 54 },
+      "id": 106
+    },
+    {
+      "id": 12,
+      "type": "text",
+      "title": "No alerting rules, no NL-bridge panel, unlabeled replica-lag gauge defaults to 0",
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 55 },
+      "options": {
+        "mode": "markdown",
+        "content": "No Prometheus alerting rule exists for any panel on this dashboard - confirmed platform-wide absence, not a Module-09-specific gap (docs/adr/0112, mirrors every sibling module's own Phase 8). `analytics_replica_lag_seconds` is an *unlabeled* Gauge that prom-client initializes to `0` the moment it registers, before the first real sample - a freshly-booted instance's panel reads `0` regardless of whether a replica is actually configured or caught up; pair this panel with `analytics_mv_refresh_job_runs_total`'s own activity before trusting a `0` reading as \"healthy\" (`MvFreshnessMonitorService`'s own doc comment). There is no panel for `askAnalyticsQuestion` (Phase 7) - every real call to it fails with `NL_QUERY_BRIDGE_UNAVAILABLE` (ADR-0111, Module 10 does not exist), so there is no successful-answer metric to show; a future panel here would need Module 10 to exist first. `EXPORT_MAX_ROWS`/`MAX_LIMIT` cost-tier thresholds were validated at this build's own small real data volume (docs/module-09-phase-8-load-test-results.md), not at their own numeric ceiling - no panel distinguishes a query that hit `MAX_LIMIT` from one that didn't, since `MetricQueryEngineService` doesn't emit that as a separate label today."
+      }
+    }
+  ]
+}

@@ -1,0 +1,127 @@
+[project]
+name = "agno-wfm-scheduling"
+version = "0.1.0"
+description = "AGNO WFM Module 04 - Scheduling Engine"
+requires-python = ">=3.11"
+license = { text = "UNLICENSED" }
+dependencies = [
+    "fastapi>=0.115,<0.116",
+    "uvicorn[standard]>=0.32,<0.33",
+    "sqlalchemy[asyncio]>=2.0,<2.1",
+    "asyncpg>=0.30,<0.32",
+    "alembic>=1.14,<1.15",
+    "psycopg2-binary>=2.9,<3.0",
+    "pydantic>=2.9,<3.0",
+    "pydantic-settings>=2.6,<3.0",
+    # GAP-08 fix (enterprise readiness audit, 2026-08-18): real JWT
+    # verification against the root platform-core service's JWKS, replacing
+    # raw X-Tenant-Id/X-Actor-Id header trust - same fix as
+    # forecasting-service's identical addition.
+    "pyjwt[crypto]>=2.9,<3.0",
+    "nats-py>=2.9,<3.0",
+    "prometheus-client>=0.21,<0.22",
+    # Phase 2 (docs/module-04-phase-2-design-doc.md). CP-SAT is this module's
+    # actual IP (module prompt §0) - Google OR-Tools per §1's mandated stack.
+    "ortools>=9.11,<10.0",
+    # Phase 6 (ADR-0059) - §4.3's mid-solve gRPC pulls into Module 01/02/03.
+    # `protobuf>=7.35,<8.0` (newer than ortools' own declared
+    # `protobuf<6.34,>=6.33.1` pin) is a deliberate override: grpc_tools.
+    # protoc's generated gencode embeds a minimum-runtime-version check
+    # (`_runtime_version.ValidateProtobufRuntimeVersion`) that rejects
+    # protobuf 6.33.x outright at import time, while ortools' CP-SAT solve
+    # itself was verified working fine against protobuf 7.35.1 in practice
+    # (its own upper bound is conservative, not a real runtime
+    # incompatibility) - see the Phase 6 design doc's assumptions.
+    "grpcio>=1.60,<2.0",
+    "protobuf>=7.35,<8.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3,<9.0",
+    "pytest-asyncio>=0.24,<0.25",
+    "httpx>=0.27,<0.28",
+    "ruff>=0.7,<0.8",
+    "mypy>=1.13,<2.0",
+    # >=1.82, not the >=1.60 floor every other pin in this file uses: no
+    # grpcio-tools release below 1.82 declares a protobuf requirement
+    # compatible with this file's own `protobuf>=7.35,<8.0` override above
+    # (confirmed via `pip install grpcio-tools==<version> "protobuf>=7.35,<8.0"
+    # --dry-run` across the whole 1.60-1.83 range - every one under 1.82
+    # pins protobuf<7.0dev or lower) - `pip install -e ".[dev]"` was
+    # `ResolutionImpossible` against a truly fresh environment before this
+    # fix (a local venv with an already-installed newer grpcio-tools masked
+    # it), which would have broken the scheduling-service CI job on any
+    # fresh checkout.
+    "grpcio-tools>=1.82,<2.0",
+    "types-protobuf>=5.0,<6.0",
+    "types-grpcio>=1.0,<2.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+# grpc_tools.protoc-generated code (Phase 6, ADR-0059; Module 07's server
+# side, ADR-0082) - not hand-written, not worth lint-fixing on every
+# regeneration.
+extend-exclude = ["app/grpc_clients/generated", "app/grpc/generated"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+# B008 flags `Depends(...)` in a default argument, which is FastAPI's own
+# idiomatic dependency-injection pattern, not a real "mutable default" bug.
+ignore = ["B008"]
+
+[tool.mypy]
+# 3.12, not 3.11 (requires-python's floor): Phase 2's `ortools` pulls in
+# numpy>=2.5 transitively, whose bundled .pyi stubs use PEP 695 `type`
+# statement syntax mypy can only parse when targeting 3.12+. This project
+# still runs on 3.11 at the interpreter level (requires-python is unchanged);
+# this only widens what syntax mypy is willing to parse in stub files.
+python_version = "3.12"
+strict = true
+disallow_untyped_defs = true
+
+[[tool.mypy.overrides]]
+# nats-py and asyncpg ship no inline types/py.typed marker. ortools ships
+# stubs with gaps mypy strict mode otherwise flags across the whole package.
+module = ["nats.*", "asyncpg.*", "ortools.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# grpc_tools.protoc-generated code (Phase 6, ADR-0059; Module 07's server
+# side, ADR-0082) - dynamically built servicer/stub classes mypy can't see
+# static attributes on. Not hand-written, not worth fighting mypy over on
+# every regeneration.
+module = ["app.grpc_clients.generated.*", "app.grpc.generated.*"]
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+# These modules' entire job is calling into the untyped generated
+# `*Stub` classes above (constructor + RPC methods, both un-annotated by
+# grpc_tools.protoc, so their return values are `Any` too) -
+# `disallow_untyped_calls`/`warn_return_any` have nothing real to catch
+# here, only the unavoidable shape of calling generated gRPC code.
+# `calendar_client`/`compliance_client` (Module 08, docs/adr/0102) added
+# alongside the four pre-existing entries, same reason as each of those.
+module = [
+    "app.grpc_clients.employee_client",
+    "app.grpc_clients.policy_client",
+    "app.grpc_clients.forecast_client",
+    "app.grpc_clients.leave_client",
+    "app.grpc_clients.calendar_client",
+    "app.grpc_clients.compliance_client",
+]
+disallow_untyped_calls = false
+warn_return_any = false

@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+// §3.3: AuditService - "fire-and-forget from every service, batched into
+// AuditLog." The external caller (Scheduling, Forecasting, any other
+// internal service acting on a tenant's behalf) gets an immediate response
+// without waiting for the Postgres write - see `AuditEventBatcherService`.
+package agno.core.v1;
+
+service AuditService {
+  rpc RecordEvent(RecordEventRequest) returns (RecordEventResponse);
+}
+
+message RecordEventRequest {
+  string tenant_id = 1;
+  // Empty string = null (a system/ai_agent action with no human actor).
+  string actor_id = 2;
+  // user | system | ai_agent
+  string actor_type = 3;
+  string action = 4;
+  string resource_type = 5;
+  string resource_id = 6;
+  // JSON-encoded, empty string = null.
+  string before_state_json = 7;
+  string after_state_json = 8;
+  // §2.2 rule 3: REQUIRED (non-empty) when actor_type = "ai_agent" - the
+  // call is rejected synchronously (not silently dropped at a later async
+  // flush) if this is missing for that actor type.
+  string ai_rationale_json = 9;
+}
+
+message RecordEventResponse {
+  bool accepted = 1;
+  // Canonical error-code registry (§3.4) string, e.g.
+  // "AI_RATIONALE_REQUIRED" - empty when accepted = true.
+  string error_code = 2;
+}

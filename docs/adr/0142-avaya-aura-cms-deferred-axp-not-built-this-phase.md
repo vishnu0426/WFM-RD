@@ -1,0 +1,17 @@
+# ADR-0142: Avaya Aura Contact Center / CMS is deferred (not built); Avaya Experience Platform is not built this phase either
+
+## Context
+
+`docs/module-12-provider-research.md`'s own Avaya section is explicit that Avaya Aura Contact Center / CMS's scope status is "research-only... whether the on-prem non-REST worker gets built is a separate resourcing decision, not implied by this research." The correct real-time mechanism there is TSAPI over Avaya Aura Application Enablement Services - a CSTA-based CTI event stream, not a REST or WebSocket surface, requiring a licensed TSAPI client library (DevConnect-gated, not freely downloadable) and a CTI user account on a real AES instance. No such instance, license, or client library exists in this environment, and none of Module 12's other 9 adapters have needed anything outside standard HTTP/WebSocket. Building a bespoke CSTA/TSAPI binary-protocol client with no real AES server to verify against would be unverifiable fabrication, not real integration work - this platform's established posture (every prior phase) is to build real protocol-conformant clients verified against a real local double of the *actual* wire protocol, not to invent an unverifiable one.
+
+Avaya Experience Platform (AXP, the cloud product) is architecturally buildable - real OAuth2, a real "Agent and Engagement Events" WebSocket Notification API, the same shape category as `GenesysCloudAdapter` (ADR-0141) already covers. It is genuinely in scope per the research doc ("cloud, in scope now"). It was not, however, named in Module 12's own §7 Phase 6b provider list (SAP SuccessFactors, ADP, Salesforce, NICE CXone, Five9, Talkdesk, plus the Avaya Aura/CMS scope decision) - that list is the phase's actual scope boundary, not the research doc's own broader coverage.
+
+## Decision
+
+Neither Avaya Aura Contact Center/CMS nor Avaya Experience Platform gets an adapter in Phase 6b. Avaya Aura/CMS is deferred pending a real resourcing decision (a licensed AES/TSAPI environment, or a decision to build against CMS's own historical-interval ODBC tables instead - the research doc's own finding that no true real-time feed exists via ODBC, only 15/30/60-min storage intervals, means that path wouldn't satisfy §5c's real-time relay requirement anyway). AXP is out of scope because Phase 6b's own provider list doesn't name it, not because it's unbuildable - a real, sourced candidate for a future phase if a tenant needs it.
+
+## Consequences
+
+- No `AvayaAuraAdapter`/`AvayaAxpAdapter` exists; `RelayAdapterRegistry.find('Avaya Aura Contact Center')` (or any Avaya provider string) returns `undefined`, and `StreamingRelayService.start()` fails that connector cleanly with `no_adapter_registered` - the same disclosed-gap behavior every unregistered provider already gets, not a special case.
+- `ProviderRateLimitConfig` already has real seeded rows for both Avaya providers (Phase 5's seed migration transcribed all 10 researched providers, including both) - seeding real researched data ahead of having a consumer is this platform's established Phase-5-era posture (ADR-0140's own note about `header_driven`/`respect_retry_after` shapes being "real, seeded, un-consumed"), not premature.
+- If Avaya Aura/CMS is ever resourced, the correct integration surface is TSAPI/CSTA over AES, not CMS ODBC - this ADR is the recorded decision so a future engineer doesn't have to re-derive that finding from the research doc.

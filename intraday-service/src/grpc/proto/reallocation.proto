@@ -1,0 +1,83 @@
+syntax = "proto3";
+
+// Module 10 Phase 4 (docs/adr/0120): `explainReallocation`'s data source -
+// this service's FIRST gRPC surface (every prior cross-module call
+// involving Module 05 has gone the other way - this module calling OUT via
+// gRPC clients, e.g. EmployeeService/CalendarService - never serving one
+// itself). Same "the owning service builds the missing read contract"
+// posture as ADR-0059/ADR-0115/ADR-0119. `ReallocationAction.ai_rationale`
+// (ADR-0070) already holds real, deterministic, metrics-citing data - this
+// surface just exposes it by id, the same way `pendingReallocations`
+// exposes it by status.
+package agno.intraday.v1;
+
+service ReallocationService {
+  rpc GetReallocationForExplanation(GetReallocationForExplanationRequest)
+      returns (GetReallocationForExplanationResponse);
+  // docs/adr/0122: `root_cause_analysis`'s second data source, alongside
+  // Module 08's AdherenceRollupService. Unary with a capped result count
+  // (not server-streaming, unlike scheduling-service's own
+  // ListPublishedShiftAssignments) - deliberately simple: this is this
+  // service's first gRPC surface of any kind, and a tenant's reallocation
+  // volume in one period is nowhere near EmployeeService.GetSchedulableEmployees'
+  // 100k+-employee scale. Tenant-wide, NOT org-unit-filtered -
+  // ReallocationAction has no org_unit_id column (it's keyed by
+  // from_queue_id/to_queue_id), a disclosed scope limitation, not an
+  // oversight (see ADR-0122).
+  rpc ListReallocationsForPeriod(ListReallocationsForPeriodRequest)
+      returns (ListReallocationsForPeriodResponse);
+}
+
+message GetReallocationForExplanationRequest {
+  string tenant_id = 1;
+  string reallocation_action_id = 2;
+}
+
+message GetReallocationForExplanationResponse {
+  // false when the id doesn't exist or belongs to a different tenant.
+  bool found = 1;
+  // Echoed from the persisted row - Module 10's §5.1 tenant-scoping
+  // assertion compares this against the requesting user's own bound
+  // tenant (ADR-0115's precedent).
+  string tenant_id = 2;
+  // system_recommendation | supervisor_manual
+  string triggered_by = 3;
+  string from_queue_id = 4;
+  string to_queue_id = 5;
+  repeated string affected_employee_ids = 6;
+  string reason = 7;
+  // suggested | approved | rejected | auto_executed | executed
+  string status = 8;
+  // JSON-encoded ReallocationAction.ai_rationale - empty string when NULL,
+  // which per this table's own CHECK constraint only happens while
+  // status = 'suggested'/'rejected'/'executed'; §2.2 rule 3 requires it
+  // non-null once status reaches 'approved'/'auto_executed'.
+  string ai_rationale_json = 9;
+  string created_at = 10; // RFC 3339
+  string executed_at = 11; // RFC 3339, empty if NULL
+}
+
+message ListReallocationsForPeriodRequest {
+  string tenant_id = 1;
+  string period_start = 2; // RFC 3339, inclusive
+  string period_end = 3;   // RFC 3339, exclusive
+}
+
+message ListReallocationsForPeriodResponse {
+  // Newest-first, capped at 100 rows (ReallocationQueryService.listForPeriod) -
+  // a root-cause narrative needs "how much reallocation churn happened,"
+  // not an exhaustive ledger; §8's own "no silent caps" convention applies -
+  // `total_matched_before_cap` discloses when the real count exceeds what's returned.
+  repeated ReallocationSummary reallocations = 1;
+  int32 total_matched_before_cap = 2;
+}
+
+message ReallocationSummary {
+  string id = 1;
+  string from_queue_id = 2;
+  string to_queue_id = 3;
+  // suggested | approved | rejected | auto_executed | executed
+  string status = 4;
+  string reason = 5;
+  string created_at = 6; // RFC 3339
+}

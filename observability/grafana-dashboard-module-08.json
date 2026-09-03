@@ -1,0 +1,245 @@
+{
+  "title": "AGNO WFM — Module 08 Adherence & Compliance (Phase 8 SLO Dashboard)",
+  "uid": "agno-wfm-module-08",
+  "schemaVersion": 39,
+  "timezone": "browser",
+  "time": { "from": "now-1h", "to": "now" },
+  "refresh": "30s",
+  "tags": ["agno-wfm", "module-08", "adherence-compliance"],
+  "panels": [
+    {
+      "type": "row",
+      "title": "SLO — Rollup job completion lag (§0.5: within ~5 min of window close, ADR-0098/0099)",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100
+    },
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "compliance_rollup_job_lag_seconds — p50/p95/p99 by period_type",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "fieldConfig": {
+        "defaults": { "unit": "s", "custom": { "drawStyle": "line" } },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(compliance_rollup_job_lag_seconds_bucket[5m])) by (le, period_type))",
+          "legendFormat": "p50 {{period_type}}"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(compliance_rollup_job_lag_seconds_bucket[5m])) by (le, period_type))",
+          "legendFormat": "p95 {{period_type}}"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(compliance_rollup_job_lag_seconds_bucket[5m])) by (le, period_type))",
+          "legendFormat": "p99 {{period_type}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "compliance_rollup_job_runs_total by period_type/result",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+      "fieldConfig": {
+        "defaults": { "unit": "reqps" },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(compliance_rollup_job_runs_total[5m])) by (period_type, result)",
+          "legendFormat": "{{period_type}} - {{result}}"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Governance signals (§6) — ComplianceRule floor validation and impact-preview overrides",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 },
+      "id": 101
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "compliance_validate_policy_against_floor_calls_total by result (Module 02's write-time gate, ADR-0100/0101)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 10 },
+      "fieldConfig": {
+        "defaults": { "unit": "reqps" },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(compliance_validate_policy_against_floor_calls_total[5m])) by (result)",
+          "legendFormat": "{{result}}"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "compliance_impact_preview_flagged_but_activated_total — a rule was activated despite flagged non-compliance (ADR-0104)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 10 },
+      "fieldConfig": {
+        "defaults": { "unit": "reqps" },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(compliance_impact_preview_flagged_but_activated_total[5m]))",
+          "legendFormat": "flagged-but-activated"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "ComplianceRule lifecycle (Phase 2)",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 18 },
+      "id": 102
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "compliance_rule_creations_total by result",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 19 },
+      "fieldConfig": {
+        "defaults": { "unit": "reqps" },
+        "overrides": []
+      },
+      "targets": [
+        { "expr": "sum(rate(compliance_rule_creations_total[5m])) by (result)", "legendFormat": "{{result}}" }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "compliance_rule_activations_total by result",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 19 },
+      "fieldConfig": {
+        "defaults": { "unit": "reqps" },
+        "overrides": []
+      },
+      "targets": [
+        { "expr": "sum(rate(compliance_rule_activations_total[5m])) by (result)", "legendFormat": "{{result}}" }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Compliance reporting (Phase 6, ADR-0105) and retention lifecycle (Phase 7, ADR-0106)",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 27 },
+      "id": 103
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "compliance_report_generations_total by report_type/result",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+      "fieldConfig": {
+        "defaults": { "unit": "reqps" },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(compliance_report_generations_total[5m])) by (report_type, result)",
+          "legendFormat": "{{report_type}} - {{result}}"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Retention lifecycle — job runs and per-row deletion outcomes",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
+      "fieldConfig": {
+        "defaults": { "unit": "reqps" },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(compliance_retention_lifecycle_job_runs_total[5m])) by (result)",
+          "legendFormat": "job run - {{result}}"
+        },
+        {
+          "expr": "sum(rate(compliance_retention_lifecycle_deletions_total[5m])) by (result)",
+          "legendFormat": "row delete - {{result}}"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "HTTP",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 36 },
+      "id": 104
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "HTTP request duration — p99 by route",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 37 },
+      "fieldConfig": {
+        "defaults": { "unit": "s", "custom": { "drawStyle": "line" } },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, route))",
+          "legendFormat": "{{route}}"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Process & platform health",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 45 },
+      "id": 105
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Process resident memory",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 46 },
+      "fieldConfig": {
+        "defaults": { "unit": "bytes" },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "process_resident_memory_bytes{job=\"agno-wfm-adherence-compliance-service\"}",
+          "legendFormat": "RSS"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Node.js event loop lag (p99)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 46 },
+      "fieldConfig": {
+        "defaults": { "unit": "s" },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "nodejs_eventloop_lag_p99_seconds{job=\"agno-wfm-adherence-compliance-service\"}",
+          "legendFormat": "p99 lag"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Known observability gaps",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 54 },
+      "id": 106
+    },
+    {
+      "id": 12,
+      "type": "text",
+      "title": "No latency histogram for ValidatePolicyAgainstFloor, impact preview, report generation, or the retention tick",
+      "gridPos": { "h": 5, "w": 24, "x": 0, "y": 55 },
+      "options": {
+        "mode": "markdown",
+        "content": "Only outcome counters exist for these four operations - no `_duration_seconds` histogram, so this dashboard cannot show p50/p95/p99 latency for any of them (unlike the rollup job's own `compliance_rollup_job_lag_seconds`). A real, disclosed gap (docs/module-08-phase-8-production-readiness-checklist.md), not fixed this phase. Separately: `AdherenceScore`/`OccupancyRecord`/`ShrinkageRecord` (the rollup jobs' own output) have no GraphQL or REST read query anywhere in this module - the single largest functional gap as of Phase 8 (docs/adr/0107) - so no panel here can show rollup *content*, only the job's own run/lag metrics. No Prometheus alerting rule exists for any panel on this dashboard - confirmed platform-wide, not a Module 08-specific gap (docs/adr/0107)."
+      }
+    }
+  ]
+}

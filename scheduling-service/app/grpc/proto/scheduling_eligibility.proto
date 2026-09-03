@@ -1,0 +1,77 @@
+syntax = "proto3";
+
+// Module 07 (Shift Marketplace) closes a gap ADR-0059/0060 left open:
+// scheduling-service had no callable single-assignment constraint check,
+// only an async full-reoptimization job queue (docs/adr/0082). This is this
+// service's first ever gRPC *server* surface - every other proto in
+// app/grpc_clients/ is an outbound stub for calling other services.
+//
+// Deliberately NOT a re-implementation of a separate "marketplace rules" set
+// (Module 07's own non-negotiable, its module prompt §0): this RPC evaluates
+// the exact same predicates app/solver/model.py's CP-SAT constraints encode
+// - `_is_eligible`/`_conflicts` reused verbatim (both already pure, model-
+// free functions), max-consecutive-days/contracted-hours re-expressed as
+// plain-Python equivalents of the same window/cap arithmetic (necessary
+// because those two are only expressible as CP-SAT constraints over decision
+// variables in model.py, not as a standalone boolean predicate - see
+// app/solver/eligibility.py's own module docstring and docs/adr/0082 for the
+// cross-validation test that guards against the two copies drifting apart).
+//
+// Unary, synchronous in the request sense (a few in-memory predicate
+// evaluations plus outbound gRPC pulls into Module 01/02/06 for
+// Employee/Policy/Leave data, exactly like solve_input_resolver.py already
+// does per-employee) - never invokes app.solver.model.solve()/CP-SAT, so it
+// does not reintroduce the request-thread CPU-bound work ADR-0060 removed.
+//
+// Regenerate stubs after editing this file:
+//   .venv/bin/python -m grpc_tools.protoc -I app/grpc/proto \
+//     --python_out=app/grpc/generated --grpc_python_out=app/grpc/generated \
+//     --pyi_out=app/grpc/generated app/grpc/proto/scheduling_eligibility.proto
+// then reapply the `from . import` fix atop the plain
+// `import scheduling_eligibility_pb2` line grpc_tools.protoc always emits in
+// scheduling_eligibility_pb2_grpc.py (same fix forecast_pb2_grpc.py needed).
+package agno.scheduling.v1;
+
+service SchedulingEligibilityService {
+  rpc CheckAssignmentEligibility(CheckAssignmentEligibilityRequest)
+      returns (CheckAssignmentEligibilityResponse);
+}
+
+message CheckAssignmentEligibilityRequest {
+  string tenant_id = 1;
+  string candidate_employee_id = 2;
+  // The ShiftAssignment identifying the shift being claimed/swapped into -
+  // scheduling-service's own persisted row is the single source of truth for
+  // that shift's start/end/skill, so the caller never has to (and can never
+  // accidentally) supply stale/tampered shift metadata over the wire.
+  string shift_assignment_id = 3;
+  // Needed to resolve the candidate's active EmploymentPolicy
+  // (PolicyService.GetActivePolicy is org-unit-scoped).
+  string org_unit_id = 4;
+  // Swap only: the assignment the candidate is giving up as part of the same
+  // transaction, excluded from the candidate's "existing assignments" set so
+  // it doesn't double-count against itself in the conflict/hours/
+  // consecutive-days checks. Empty for a plain open-shift claim.
+  string exclude_shift_assignment_id = 5;
+}
+
+message CheckAssignmentEligibilityResponse {
+  // false when shift_assignment_id doesn't resolve for this tenant (already
+  // claimed/deleted since the marketplace post was created) - the caller
+  // must treat this as "post is stale," never as "eligible" by default.
+  bool shift_assignment_found = 1;
+  bool eligible = 2;
+  repeated EligibilityViolation violations = 3;
+}
+
+message EligibilityViolation {
+  // "skill" | "leave_conflict" | "shift_overlap" | "min_rest" |
+  // "max_consecutive_days" | "contracted_hours" - matches
+  // app/solver/eligibility.py's category constants 1:1, so Module 07 can
+  // switch on this value without string-matching free text.
+  string category = 1;
+  // Human-readable, structured-ish detail (e.g. "shift overlaps an existing
+  // assignment 2026-03-04 09:00-17:00") - Module 07's own §2.2 rule 1 needs a
+  // clear reason on rejection, not just a generic failure.
+  string detail = 2;
+}

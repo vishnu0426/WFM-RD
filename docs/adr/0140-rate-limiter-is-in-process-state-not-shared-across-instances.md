@@ -1,0 +1,13 @@
+# ADR-0140: `RateLimiterService`'s token buckets are in-process state, not shared across instances
+
+## Context
+§5a requires "a token-bucket/sliding-window limiter per `(tenant_id, connector_id)` pair," enforced by the sync job runner *before* calling the provider. This module has no Redis presence (§1's own tech-stack table names Postgres for the datastore and doesn't add Redis for this module) and no other shared-state mechanism available to a background `@Cron` process running inside a single NestJS process.
+
+## Decision
+`RateLimiterService` (`src/sync/batch/rate-limiter.service.ts`) holds its token buckets in a plain in-process `Map`, keyed by `(tenant_id, connector_id)`. This is fully correct as long as exactly one instance of `integration-hub-service` is running the batch-runner's `@Cron` tick - which is this platform's current deployment reality for every service so far (no service in this build has multiple concurrently-cron-ticking instances).
+
+## Consequences
+- **A real, disclosed scaling gap, not solved here**: running more than one instance of this service with the cron tick active in each would give each instance its own independent view of a connector's remaining budget - two instances could each think a full bucket is available and together exceed the real provider quota. This is the same category of gap `docs/module-12-provider-research.md`'s own "self-imposed conservative default" language already anticipates for providers with no hard published number, made concrete here for the enforcement mechanism itself.
+- The real fix, if/when this service is ever run with more than one active cron-ticking instance, is a shared store (Redis, matching every other rate-limiter/lock pattern already used elsewhere in this platform) holding the bucket state instead of an in-process `Map` - a real, scoped follow-up, not a redesign of the token-bucket algorithm itself (`tryAcquire`'s external contract - "does this tenant+connector have a token right now" - stays identical either way).
+- Until that's built, running this service as a single active instance (or disabling the `@Cron` tick on all but one replica, a standard pattern for singleton scheduled jobs) is a real operational requirement, worth calling out explicitly in `docs/production-readiness-checklist.md` once this module reaches that stage (Phase 8), not assumed obvious.
+- This gap does not affect the *reactive* half of §5a (`withBackoffRetry`'s real 429 handling in `WorkdayAdapter`) - that's per-call, stateless, and correct regardless of how many instances are running, since each instance backs off independently in response to its own real 429 responses.

@@ -1,0 +1,126 @@
+version: "3.9"
+
+# Local development only. Production Postgres is provisioned via Terraform
+# (RDS/Cloud SQL + PgBouncer + read replicas + PITR) - not modeled here.
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: agno-wfm-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: agno_wfm
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_local_only
+    ports:
+      - "5432:5432"
+    volumes:
+      - agno_wfm_pgdata:/var/lib/postgresql/data
+      - ./scripts/init-roles.sql:/docker-entrypoint-initdb.d/01-init-roles.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Module 03's event backbone - replaces the source spec's Kafka reference
+  # platform-wide (docs/module-03-phase-1-design-doc.md). JetStream enabled
+  # (`-js`) since Module 03 publishes to a durable stream, not core NATS
+  # pub/sub. Nothing in Module 01/02 consumes this yet.
+  nats:
+    image: nats:2-alpine
+    container_name: agno-wfm-nats
+    restart: unless-stopped
+    command: ["-js"]
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8222/healthz"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Phase 2 (§1): session cache, refresh-token-family fast-lookup pointer, and
+  # access-token revocation blacklist - Redis is cache/session only here, never
+  # system of record (Postgres holds the durable refresh_token/signing_key rows).
+  redis:
+    image: redis:7-alpine
+    container_name: agno-wfm-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Phase 6 (§1's "Envoy gateway" requirement, ADR-0048) - fronts this app's
+  # REST/GraphQL (8080) and internal gRPC (8081) surfaces. The app itself
+  # runs on the host (`npm run start:dev`, per the README), not as a
+  # docker-compose service - see envoy/envoy.yaml's own comment for how the
+  # two clusters reach it locally.
+  envoy:
+    image: envoyproxy/envoy:v1.31-latest
+    container_name: agno-wfm-envoy
+    restart: unless-stopped
+    volumes:
+      - ./envoy/envoy.yaml:/etc/envoy/envoy.yaml:ro
+    ports:
+      - "8080:8080" # REST/GraphQL edge
+      - "8081:8081" # internal gRPC
+      - "9901:9901" # admin/stats interface
+
+  # Phase 7 (§1's observability requirement, ADR-0050) - scrapes this app's
+  # GET /metrics on a 15s interval (observability/prometheus.yml).
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: agno-wfm-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      # Module 10 Phase 9 (docs/adr/0133) - this platform's first
+      # Prometheus alerting rules file, referenced by prometheus.yml's own
+      # `rule_files:`.
+      - ./observability/alert-rules-module-10.yml:/etc/prometheus/alert-rules-module-10.yml:ro
+      - agno_wfm_prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+
+  # Phase 7 - pre-provisioned with the Prometheus datasource and the
+  # observability/grafana-dashboard.json SLO dashboard, so
+  # `docker-compose up -d grafana` gives a working dashboard with no
+  # manual click-through setup. Default local-dev login: admin/admin.
+  grafana:
+    image: grafana/grafana:11.3.1
+    container_name: agno-wfm-grafana
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    volumes:
+      - ./observability/grafana-provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana-dashboard.json:/etc/grafana/provisioning/dashboards/json/grafana-dashboard.json:ro
+      # Module 07 (shift-marketplace-service), Phase 8 (docs/adr/0092).
+      # Note: module-05/06's own dashboard JSON files exist on disk but
+      # were never given a mount line here - a pre-existing gap in those
+      # modules, not something this line fixes; this line covers only
+      # this module's own dashboard.
+      - ./observability/grafana-dashboard-module-07.json:/etc/grafana/provisioning/dashboards/json/grafana-dashboard-module-07.json:ro
+      # Module 08 (adherence-compliance-service), Phase 8 (docs/adr/0107).
+      - ./observability/grafana-dashboard-module-08.json:/etc/grafana/provisioning/dashboards/json/grafana-dashboard-module-08.json:ro
+      # Module 09 (analytics-reporting-service), Phase 8 (docs/adr/0112).
+      - ./observability/grafana-dashboard-module-09.json:/etc/grafana/provisioning/dashboards/json/grafana-dashboard-module-09.json:ro
+      # Module 10 (ai-layer-service), Phase 8 (docs/adr/0130).
+      - ./observability/grafana-dashboard-module-10.json:/etc/grafana/provisioning/dashboards/json/grafana-dashboard-module-10.json:ro
+      - agno_wfm_grafana_data:/var/lib/grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    ports:
+      - "3001:3000"
+
+volumes:
+  agno_wfm_pgdata:
+  agno_wfm_prometheus_data:
+  agno_wfm_grafana_data:

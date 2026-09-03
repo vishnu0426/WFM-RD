@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+// §3.3: PolicyService - "e.g. Scheduling fetches current overtime rules
+// before generating a schedule." Resolves "active as of" a given
+// timestamp, not just "latest" (§3.3's own explicit requirement) - a
+// scheduler generating a schedule for a past or future date must see the
+// policy that was/will be in force then, not whatever is open right now.
+package agno.core.v1;
+
+service PolicyService {
+  rpc GetActivePolicy(GetActivePolicyRequest) returns (PolicyResponse);
+}
+
+message GetActivePolicyRequest {
+  string tenant_id = 1;
+  // Exactly one of policy_group_id or policy_type must be set. If
+  // policy_group_id is set, org_unit_id is ignored (the lineage already
+  // determines its own scope).
+  string policy_group_id = 2;
+  string policy_type = 3;
+  // Only meaningful with policy_type: empty = tenant-wide lookup,
+  // non-empty = look up the lineage scoped to that org unit (ADR-0012).
+  string org_unit_id = 4;
+  // RFC 3339 timestamp. Empty = now.
+  string as_of = 5;
+}
+
+message PolicyResponse {
+  bool found = 1;
+  string id = 2;
+  string policy_group_id = 3;
+  string policy_type = 4;
+  // Empty string, not a sentinel, when the policy is tenant-wide.
+  string org_unit_id = 5;
+  // JSON-encoded `Policy.definition` (JSONB, arbitrary shape per §2.1 rule 4).
+  string definition_json = 6;
+  string effective_from = 7;
+  // Empty string when the version is still open (no successor yet).
+  string effective_to = 8;
+  int32 version = 9;
+}

@@ -1,0 +1,99 @@
+# Phase 7 (§1's observability requirement, ADR-0050). Local-dev/reference
+# scrape config - a production deployment would use service discovery
+# (Kubernetes SD, EC2 SD, ...) instead of a static target list.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+# Module 10 Phase 9 (docs/adr/0133): this platform's first Prometheus
+# alerting rules file at all - confirmed platform-wide absent before this
+# (ADR-0107's own finding for Module 08, reconfirmed while building Module
+# 10's own dashboard). Scoped to ai-layer-service's own security-relevant
+# metrics only - retrofitting alerting for every other module's own
+# dashboard is a separate, larger effort out of this phase's own scope.
+rule_files:
+  - /etc/prometheus/alert-rules-module-10.yml
+
+scrape_configs:
+  - job_name: agno-wfm-platform-core
+    metrics_path: /metrics
+    static_configs:
+      # host.docker.internal: this app runs on the host (`npm run
+      # start:dev`), not as a docker-compose service - same reasoning as
+      # envoy/envoy.yaml's clusters (ADR-0048).
+      - targets: ["host.docker.internal:3000"]
+
+  # Module 03 (forecasting-service, Python/FastAPI), Phase 8 (docs/adr/0026).
+  # `prometheus-client`, not `prom-client` - same `/metrics` path convention,
+  # different process/port. Also runs on the host (`uvicorn app.main:app`),
+  # not as a docker-compose service - same `host.docker.internal` reasoning.
+  - job_name: agno-wfm-forecasting-service
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["host.docker.internal:8000"]
+
+  # Module 05 (intraday-service, NestJS), Phase 8 (docs/adr/0072). Same
+  # `prom-client`/`/metrics` convention as agno-wfm-platform-core, own port
+  # (8200), also host-run, not a docker-compose service.
+  - job_name: agno-wfm-intraday-service
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["host.docker.internal:8200"]
+
+  # Module 06 (attendance-leave-service, NestJS), Phase 1
+  # (docs/module-06-phase-1-design-doc.md). Same `prom-client`/`/metrics`
+  # convention as the other Node services, own port (8300), also host-run,
+  # not a docker-compose service.
+  - job_name: agno-wfm-attendance-leave-service
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["host.docker.internal:8300"]
+
+  # Module 07 (shift-marketplace-service, NestJS), Phase 8 (docs/adr/0092).
+  # Same `prom-client`/`/metrics` convention as the other Node services,
+  # own port (8400), also host-run, not a docker-compose service.
+  - job_name: agno-wfm-shift-marketplace-service
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["host.docker.internal:8400"]
+
+  # Module 08 (adherence-compliance-service, NestJS), Phase 1
+  # (docs/module-08-phase-1-design-doc.md). Same `prom-client`/`/metrics`
+  # convention as the other Node services, own port (8500), also host-run,
+  # not a docker-compose service.
+  - job_name: agno-wfm-adherence-compliance-service
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["host.docker.internal:8500"]
+
+  # Module 09 (analytics-reporting-service, NestJS), Phase 1
+  # (docs/module-09-phase-1-design-doc.md). Same `prom-client`/`/metrics`
+  # convention as the other Node services, own port (8600), also host-run,
+  # not a docker-compose service.
+  - job_name: agno-wfm-analytics-reporting-service
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["host.docker.internal:8600"]
+
+  # Module 10 (ai-layer-service, NestJS), Phase 1
+  # (docs/module-10-phase-1-design-doc.md). Same `prom-client`/`/metrics`
+  # convention as the other Node services, own port (8700), also host-run,
+  # not a docker-compose service. Was missing from this scrape config
+  # entirely until Phase 9 (docs/adr/0133) - the Phase 8 dashboard's own
+  # `job="agno-wfm-ai-layer-service"` panels had nothing to actually read
+  # from until this was added.
+  - job_name: agno-wfm-ai-layer-service
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["host.docker.internal:8700"]
+
+  # Module 12 (integration-hub-service, NestJS), Phase 1
+  # (docs/module-12-phase-1-design-doc.md). Same `prom-client`/`/metrics`
+  # convention as the other Node services, own port (8900), also host-run,
+  # not a docker-compose service. Added from Phase 1 itself, unlike
+  # ai-layer-service above - see that job's own comment for the gap this
+  # avoids repeating.
+  - job_name: agno-wfm-integration-hub-service
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["host.docker.internal:8900"]

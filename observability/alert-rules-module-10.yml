@@ -1,0 +1,93 @@
+# Module 10 Phase 9 (docs/adr/0133) - this platform's first Prometheus
+# alerting rules file. Scoped to ai-layer-service's own security-relevant
+# metrics (§0.5's own on-call table), not a general SLO rule set for every
+# panel on the Module 10 dashboard - retrofitting alerting for every other
+# module's own dashboard, or every latency/volume panel here, is a
+# separate, larger effort out of this phase's own scope, disclosed in the
+# Phase 9 readiness checklist.
+groups:
+  - name: agno-wfm-module-10-ai-layer-security
+    rules:
+      # §5.1/§0.5: "any tenant-scoping verification failure pages
+      # accordingly - a potential security incident, not a routine error."
+      # Fires on the very first occurrence, no `for:` delay - this is
+      # exactly the kind of event that should never wait for a trend.
+      - alert: AiLayerCrossTenantDataAssemblyDetected
+        expr: increase(ai_tenant_scope_assertion_failures_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          service: ai-layer-service
+        annotations:
+          summary: 'ai-layer-service assembled cross-tenant data ({{ $labels.source_module }})'
+          description: >-
+            TenantScopeAssertionService rejected a gRPC response scoped to a
+            different tenant than the one that asked, from source_module
+            "{{ $labels.source_module }}" - a durable audit event was also
+            written (docs/adr/0118). Investigate immediately; this should
+            never happen under correct tenant-scoping upstream.
+
+      # docs/adr/0133: RBAC denials are otherwise invisible to every other
+      # metric (Guards run before HttpMetricsInterceptor) - a sustained
+      # spike is worth distinguishing from routine, expected denials
+      # (a client with an expired token retrying, a permission
+      # misconfiguration during rollout) via the `for:` duration below.
+      - alert: AiLayerRbacDenialSpike
+        expr: sum(rate(ai_rbac_denials_total[5m])) > 1
+        for: 10m
+        labels:
+          severity: warning
+          service: ai-layer-service
+        annotations:
+          summary: 'Sustained RBAC denial rate in ai-layer-service'
+          description: >-
+            More than 1 RBAC denial/sec, sustained for 10 minutes
+            (ai_rbac_denials_total by reason: unauthenticated/
+            forbidden_permission/forbidden_tenant_mismatch). Could mean a
+            misconfigured client, an expired-token retry loop, or a probing
+            attempt - not necessarily malicious, but worth a look.
+
+      # §4/docs/adr/0128: any circuit opening is worth a page - it means 5
+      # consecutive real (non-tenant-specific) LLM API failures already
+      # happened for one BYOK provider, and every tenant on that provider
+      # is now being short-circuited into degraded mode.
+      - alert: AiLayerLlmCircuitBreakerOpened
+        expr: increase(ai_circuit_breaker_state_transitions_total{to_state="open"}[5m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+          service: ai-layer-service
+        annotations:
+          summary: 'An LLM provider circuit breaker opened in ai-layer-service'
+          description: >-
+            LlmCircuitBreakerService opened a circuit after 5 consecutive
+            countable failures - every tenant configured on the affected
+            provider is now being served degraded-mode responses (or, for
+            askQuestion, an explicit unavailability error) until the
+            30s-cooldown half-open trial succeeds. The application log
+            names which provider (anthropic/openai/gemini/ollama) - this
+            metric itself carries no provider label (docs/adr/0128's own
+            considered-and-skipped third label dimension).
+
+      # §0.5 on-call table: "error rate spiking" for the LLM API itself,
+      # distinct from the circuit breaker's own short-circuit behavior.
+      - alert: AiLayerLlmApiErrorRateSpike
+        # A zero-traffic window makes this 0/0 (NaN) - PromQL drops NaN
+        # from a `>` comparison automatically, so this simply doesn't fire
+        # rather than needing an explicit "denominator > 0" guard.
+        expr: >-
+          sum(rate(ai_llm_api_calls_total{result="error"}[5m]))
+          /
+          sum(rate(ai_llm_api_calls_total[5m]))
+          > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          service: ai-layer-service
+        annotations:
+          summary: 'More than half of real LLM API calls are failing in ai-layer-service'
+          description: >-
+            Over 50% of non-short-circuited LLM API calls failed over the
+            last 5 minutes - a real, attempted-and-failed rate, not calls
+            already refused by an open circuit breaker (result="error", not
+            "short_circuited").

@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+// §3.3: CalendarService.GetWorkingTimeRules - holidays + business hours per
+// org unit, for a date range.
+package agno.org.v1;
+
+service CalendarService {
+  rpc GetWorkingTimeRules(GetWorkingTimeRulesRequest) returns (WorkingTimeRules);
+}
+
+message GetWorkingTimeRulesRequest {
+  string tenant_id = 1;
+  // Empty = the tenant-wide default calendar (same convention as
+  // WorkingTimeCalendarsService.findForOrgUnit throughout the REST/GraphQL
+  // surface, Phase 5).
+  string org_unit_id = 2;
+  string from_date = 3;
+  string to_date = 4;
+}
+
+message WorkingTimeRules {
+  string country_code = 1;
+  string timezone = 2;
+  // Filtered to [from_date, to_date].
+  repeated string holiday_dates = 3;
+  // JSON-encoded (the underlying column is itself arbitrary-shaped JSON,
+  // §2.1 - proto3 has no native "any JSON object" scalar without pulling in
+  // google.protobuf.Struct's well-known-type include path, which this
+  // module avoids for portability, same reasoning as `Policy.definition`'s
+  // GraphQL `JSON` scalar not needing a proto counterpart here).
+  string standard_business_hours_json = 4;
+}
