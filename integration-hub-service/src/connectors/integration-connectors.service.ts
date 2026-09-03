@@ -4,6 +4,7 @@ import { DataSource } from 'typeorm';
 import { randomUUID } from 'crypto';
 import { withTenantConnection } from '../database/with-tenant-connection';
 import { VaultClientService } from '../vault/vault-client.service';
+import { VaultSecretNotFoundError, VaultUnavailableError } from '../vault/vault.errors';
 import {
   ConnectorStatus,
   ConnectorType,
@@ -11,10 +12,24 @@ import {
 } from '../integrations/entities/integration-connector.entity';
 import { assertNoRawCredentialMaterial } from './credential-shape-guard';
 import { generateOAuthState, parseOAuthState } from './oauth-state';
+import { validateConnectorSettings } from './config-schemas';
 import { InvalidCreateConnectorInputError } from './errors/invalid-create-connector-input.error';
 import { ConnectorNotFoundError } from './errors/connector-not-found.error';
 import { ConnectorNotPendingOAuthSetupError, OAuthStateMismatchError } from './errors/oauth-callback.errors';
 import { OAuthTokenExchangeService } from './oauth-token-exchange.service';
+import { AuditGrpcClientService } from '../grpc/audit-grpc-client.service';
+
+export interface ConnectionTestResult {
+  ok: boolean;
+  checkedAt: Date;
+  detail: string;
+}
+
+/** `actorId: null` maps to audit.proto's own "empty string = null" convention (`AuditGrpcClientService` request shape) - never fabricated, always the verified token's own `sub` claim. */
+export interface Actor {
+  id: string | null;
+  type: 'user' | 'system';
+}
 
 export interface CreateConnectorOAuthInput {
   clientId: string;
@@ -64,9 +79,18 @@ export class IntegrationConnectorsService {
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly vault: VaultClientService,
     private readonly oauthTokenExchange: OAuthTokenExchangeService,
+    private readonly audit: AuditGrpcClientService,
   ) {}
 
-  async create(tenantId: string, rawInput: CreateConnectorInput): Promise<CreateConnectorResult> {
+  // `actor` defaults to a system actor (rather than being required) so
+  // every pre-existing internal/test caller of this method - none of
+  // which know about audit attribution - keeps compiling unchanged; the
+  // real GraphQL resolver always passes the verified token's own actor.
+  async create(
+    tenantId: string,
+    rawInput: CreateConnectorInput,
+    actor: Actor = { id: null, type: 'system' },
+  ): Promise<CreateConnectorResult> {
     // Defense in depth at the service boundary: `oauth` counts as
     // "provided" only if `clientId` (a genuinely required field) is
     // present - the GraphQL resolver (own doc comment) already guarantees
@@ -119,6 +143,18 @@ export class IntegrationConnectorsService {
       }),
     );
 
+    await this.audit.record({
+      tenantId,
+      actorId: actor.id ?? '',
+      actorType: actor.type,
+      action: 'connector.created',
+      resourceType: 'integration_connector',
+      resourceId: connector.id,
+      beforeStateJson: '',
+      afterStateJson: JSON.stringify({ connectorType: connector.connectorType, provider: connector.provider, status: connector.status }),
+      aiRationaleJson: '',
+    });
+
     return { connector, authorizationUrl };
   }
 
@@ -136,6 +172,126 @@ export class IntegrationConnectorsService {
       throw new ConnectorNotFoundError(connectorId);
     }
     return connector;
+  }
+
+  /**
+   * WP1: settings are validated (`validateConnectorSettings`) and merged
+   * under `config.settings`, never replacing `config` wholesale - the rest
+   * of `config` holds credential references/OAuth metadata this method
+   * must never touch. Re-runs `assertNoRawCredentialMaterial` on the full
+   * merged config for the same reason `create` does: a caller cannot use
+   * this path to smuggle credential-shaped material past the guard either.
+   */
+  async updateSettings(
+    tenantId: string,
+    connectorId: string,
+    rawSettings: Record<string, unknown>,
+    actor: Actor = { id: null, type: 'system' },
+  ): Promise<IntegrationConnector> {
+    const before = await this.findByIdForTenant(tenantId, connectorId);
+    const settings = validateConnectorSettings(rawSettings);
+    const config = {
+      ...(before.config as Record<string, unknown>),
+      settings: { ...((before.config as Record<string, unknown>).settings as Record<string, unknown> | undefined), ...settings },
+    };
+    assertNoRawCredentialMaterial(config);
+
+    const connector = await withTenantConnection(this.dataSource, tenantId, (manager) =>
+      manager.save(IntegrationConnector, { ...before, config }),
+    );
+
+    await this.audit.record({
+      tenantId,
+      actorId: actor.id ?? '',
+      actorType: actor.type,
+      action: 'connector.settings_updated',
+      resourceType: 'integration_connector',
+      resourceId: connectorId,
+      beforeStateJson: JSON.stringify((before.config as Record<string, unknown>).settings ?? {}),
+      afterStateJson: JSON.stringify(config.settings),
+      aiRationaleJson: '',
+    });
+
+    return connector;
+  }
+
+  /**
+   * Soft delete (decision #1 / `ConnectorStatus.DISABLED`'s own doc
+   * comment): `agno_integration_hub_app` has no DELETE grant on this
+   * table, and `field_mapping`/`sync_job`/`reason_code` all carry a real FK
+   * to it - a hard delete would either fail at the DB permission layer or
+   * violate referential integrity once any sync/mapping history exists.
+   * Idempotent: disabling an already-disabled connector is not an error.
+   */
+  async disable(
+    tenantId: string,
+    connectorId: string,
+    actor: Actor = { id: null, type: 'system' },
+  ): Promise<IntegrationConnector> {
+    const before = await this.findByIdForTenant(tenantId, connectorId);
+    if (before.status === ConnectorStatus.DISABLED) {
+      return before;
+    }
+
+    const connector = await withTenantConnection(this.dataSource, tenantId, (manager) =>
+      manager.save(IntegrationConnector, { ...before, status: ConnectorStatus.DISABLED }),
+    );
+
+    await this.audit.record({
+      tenantId,
+      actorId: actor.id ?? '',
+      actorType: actor.type,
+      action: 'connector.deleted',
+      resourceType: 'integration_connector',
+      resourceId: connectorId,
+      beforeStateJson: JSON.stringify({ status: before.status }),
+      afterStateJson: JSON.stringify({ status: ConnectorStatus.DISABLED }),
+      aiRationaleJson: '',
+    });
+
+    return connector;
+  }
+
+  /**
+   * WP1's "Test Connection": the one universally real, non-fabricated
+   * check available across every connector type today is "can this
+   * connector's stored credential/OAuth token actually be read back from
+   * Vault" - `sync`-triggering adapters don't expose any lighter-weight
+   * ping/health-check method of their own (checked against every
+   * `sync/batch/providers/*.adapter.ts` file), so this deliberately does
+   * NOT claim to verify protocol-level reachability of the external
+   * system. `detail` says exactly what was and wasn't checked, rather than
+   * implying a full connectivity test that didn't happen.
+   */
+  async testConnection(tenantId: string, connectorId: string): Promise<ConnectionTestResult> {
+    const connector = await this.findByIdForTenant(tenantId, connectorId);
+    const config = connector.config as Record<string, unknown>;
+    const reference = (config.credentialReference ?? config.oauthClientSecretReference) as string | undefined;
+
+    if (!reference) {
+      return {
+        ok: false,
+        checkedAt: new Date(),
+        detail: 'No credential reference is stored on this connector yet (OAuth setup incomplete).',
+      };
+    }
+
+    try {
+      await this.vault.read(reference);
+      return {
+        ok: true,
+        checkedAt: new Date(),
+        detail: 'Stored credential is present and readable in Vault. This does not verify reachability of the external provider.',
+      };
+    } catch (err) {
+      if (err instanceof VaultSecretNotFoundError) {
+        return { ok: false, checkedAt: new Date(), detail: 'Stored credential reference no longer exists in Vault.' };
+      }
+      if (err instanceof VaultUnavailableError) {
+        return { ok: false, checkedAt: new Date(), detail: `Vault is unavailable: ${err.message}` };
+      }
+      throw err;
+    }
   }
 
   /**

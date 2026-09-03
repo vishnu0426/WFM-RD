@@ -94,7 +94,7 @@ describe('TalkdeskAdapter (real Postgres + real Vault + real local Talkdesk-shap
       token: process.env.VAULT_TOKEN,
       kvMount: process.env.VAULT_KV_MOUNT ?? 'secret',
     });
-    connectors = new IntegrationConnectorsService(appDataSource, vault, new OAuthTokenExchangeService());
+    connectors = new IntegrationConnectorsService(appDataSource, vault, new OAuthTokenExchangeService(), { record: async () => undefined } as any);
     fieldMappings = new FieldMappingsService(appDataSource);
     syncJobs = makeRealSyncJobsService(appDataSource);
 

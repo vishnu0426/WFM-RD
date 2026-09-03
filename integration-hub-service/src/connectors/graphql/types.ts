@@ -41,6 +41,23 @@ export class IntegrationConnectorResult {
 
   @Field(() => SyncJobStatus, { nullable: true })
   lastSyncStatus!: SyncJobStatus | null;
+
+  /** WP1's validated non-credential settings (`config.settings`) - never `config` itself. See `config-schemas.ts`. */
+  @Field(() => Object, { nullable: true })
+  settings!: Record<string, unknown> | null;
+}
+
+/** WP1's "Test Connection" result - see `IntegrationConnectorsService.testConnection`'s own doc comment for exactly what `ok: true` does and does not verify. */
+@ObjectType('ConnectorTestResult')
+export class ConnectorTestResultType {
+  @Field(() => Boolean)
+  ok!: boolean;
+
+  @Field(() => Date)
+  checkedAt!: Date;
+
+  @Field()
+  detail!: string;
 }
 
 @ObjectType('CreateConnectorResult')
@@ -166,6 +183,7 @@ export class FieldAuthorityPolicyResult {
 }
 
 export function toIntegrationConnectorResult(connector: IntegrationConnector): IntegrationConnectorResult {
+  const config = connector.config as Record<string, unknown>;
   return {
     id: connector.id,
     connectorType: connector.connectorType,
@@ -173,6 +191,7 @@ export function toIntegrationConnectorResult(connector: IntegrationConnector): I
     status: connector.status,
     lastSyncAt: connector.lastSyncAt,
     lastSyncStatus: connector.lastSyncStatus,
+    settings: (config.settings as Record<string, unknown> | undefined) ?? null,
   };
 }
 

@@ -96,7 +96,7 @@ describe('NiceCxoneAdapter (real Postgres + real Vault + real local NICE-CXone-s
       token: process.env.VAULT_TOKEN,
       kvMount: process.env.VAULT_KV_MOUNT ?? 'secret',
     });
-    connectors = new IntegrationConnectorsService(appDataSource, vault, new OAuthTokenExchangeService());
+    connectors = new IntegrationConnectorsService(appDataSource, vault, new OAuthTokenExchangeService(), { record: async () => undefined } as any);
     fieldMappings = new FieldMappingsService(appDataSource);
     syncJobs = makeRealSyncJobsService(appDataSource);
 

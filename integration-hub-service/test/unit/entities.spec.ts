@@ -35,8 +35,10 @@ describe('database entities', () => {
     expect(Object.values(ConnectorType).sort()).toEqual(['acd', 'crm', 'custom_webhook', 'hris', 'payroll'].sort());
   });
 
-  it("ConnectorStatus matches §2.1's enum exactly", () => {
-    expect(Object.values(ConnectorStatus).sort()).toEqual(['active', 'error', 'paused', 'pending_setup'].sort());
+  it("ConnectorStatus matches §2.1's enum plus WP1's soft-delete 'disabled' state", () => {
+    expect(Object.values(ConnectorStatus).sort()).toEqual(
+      ['active', 'disabled', 'error', 'paused', 'pending_setup'].sort(),
+    );
   });
 
   it("SyncJobStatus matches §2.1's enum exactly (shared by IntegrationConnector.lastSyncStatus and SyncJob.status)", () => {

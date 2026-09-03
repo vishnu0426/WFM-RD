@@ -107,7 +107,7 @@ describe('AvayaAuraAdapter (real Postgres + real Vault + real local ECMA-323 CST
       token: process.env.VAULT_TOKEN,
       kvMount: process.env.VAULT_KV_MOUNT ?? 'secret',
     });
-    connectors = new IntegrationConnectorsService(appDataSource, vault, new OAuthTokenExchangeService());
+    connectors = new IntegrationConnectorsService(appDataSource, vault, new OAuthTokenExchangeService(), { record: async () => undefined } as any);
     fieldMappings = new FieldMappingsService(appDataSource);
     syncJobs = makeRealSyncJobsService(appDataSource);
 

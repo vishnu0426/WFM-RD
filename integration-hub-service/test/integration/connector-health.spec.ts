@@ -56,7 +56,7 @@ describe('ConnectorHealthResolver (real Postgres + real Vault)', () => {
       token: process.env.VAULT_TOKEN,
       kvMount: process.env.VAULT_KV_MOUNT ?? 'secret',
     });
-    connectors = new IntegrationConnectorsService(appDataSource, vault, new OAuthTokenExchangeService());
+    connectors = new IntegrationConnectorsService(appDataSource, vault, new OAuthTokenExchangeService(), { record: async () => undefined } as any);
     syncJobs = makeRealSyncJobsService(appDataSource);
     tenantContext = new TenantContextService();
     resolver = new ConnectorHealthResolver(connectors, syncJobs, tenantContext);

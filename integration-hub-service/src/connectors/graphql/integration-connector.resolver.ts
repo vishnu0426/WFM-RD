@@ -1,18 +1,25 @@
-import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
+import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { UseGuards } from '@nestjs/common';
 import { TenantContextService } from '../../common/tenant/tenant-context.service';
-import { IntegrationConnectorsService } from '../integration-connectors.service';
+import { IntegrationConnectorsService, Actor } from '../integration-connectors.service';
 import { ConnectorType } from '../../integrations/entities/integration-connector.entity';
 import { AccessTokenGuard } from '../../auth/access-token.guard';
 import { PermissionsGuard } from '../../auth/permissions.guard';
 import { TenantTokenMatchGuard } from '../../auth/tenant-token-match.guard';
 import { RequirePermissions } from '../../auth/require-permissions.decorator';
+import { CurrentTokenClaims } from '../../auth/current-token-claims.decorator';
+import { AccessTokenClaims } from '../../auth/access-token.guard';
 import {
+  ConnectorTestResultType,
   CreateConnectorResultType,
   IntegrationConnectorResult,
   toCreateConnectorResultType,
   toIntegrationConnectorResult,
 } from './types';
+
+function actorFromClaims(claims: AccessTokenClaims | undefined): Actor {
+  return { id: claims?.sub ?? null, type: 'user' };
+}
 
 /**
  * §3.1. `connectors` derives its tenant from `TenantContextService`
@@ -77,6 +84,7 @@ export class IntegrationConnectorResolver {
     @Args('oauthTokenEndpoint', { nullable: true }) oauthTokenEndpoint?: string,
     @Args('oauthRedirectUri', { nullable: true }) oauthRedirectUri?: string,
     @Args('oauthScope', { nullable: true }) oauthScope?: string,
+    @CurrentTokenClaims() claims?: AccessTokenClaims,
   ): Promise<CreateConnectorResultType> {
     const tenantId = this.tenantContext.requireTenantId();
     const oauth = oauthClientId
@@ -89,13 +97,62 @@ export class IntegrationConnectorResolver {
           scope: oauthScope,
         }
       : undefined;
-    const result = await this.connectors.create(tenantId, {
-      connectorType,
-      provider,
-      credentials,
-      additionalConfig,
-      oauth,
-    });
+    const result = await this.connectors.create(
+      tenantId,
+      { connectorType, provider, credentials, additionalConfig, oauth },
+      actorFromClaims(claims),
+    );
     return toCreateConnectorResultType(result);
+  }
+
+  /**
+   * WP1: real backend persistence for "Data Source Settings" (decision
+   * #1) - `settings` is validated server-side (`validateConnectorSettings`)
+   * against the whitelist in `config-schemas.ts`, never a raw passthrough.
+   */
+  @UseGuards(AccessTokenGuard, PermissionsGuard, TenantTokenMatchGuard)
+  @RequirePermissions('integration_connector:write')
+  @Mutation(() => IntegrationConnectorResult)
+  async updateConnectorSettings(
+    @Args('connectorId', { type: () => ID }) connectorId: string,
+    @Args('settings', { type: () => Object }) settings: Record<string, unknown>,
+    @CurrentTokenClaims() claims?: AccessTokenClaims,
+  ): Promise<IntegrationConnectorResult> {
+    const tenantId = this.tenantContext.requireTenantId();
+    const connector = await this.connectors.updateSettings(tenantId, connectorId, settings, actorFromClaims(claims));
+    return toIntegrationConnectorResult(connector);
+  }
+
+  /**
+   * Soft delete - see `ConnectorStatus.DISABLED`'s own doc comment. Its
+   * own permission (`integration_connector:delete`), not `:write` - the
+   * spec's own RBAC section treats "Data Source Delete" as a distinct,
+   * separately grantable action from update, and this is the module's
+   * only irreversible-in-the-UI connector action.
+   */
+  @UseGuards(AccessTokenGuard, PermissionsGuard, TenantTokenMatchGuard)
+  @RequirePermissions('integration_connector:delete')
+  @Mutation(() => IntegrationConnectorResult)
+  async deleteConnector(
+    @Args('connectorId', { type: () => ID }) connectorId: string,
+    @CurrentTokenClaims() claims?: AccessTokenClaims,
+  ): Promise<IntegrationConnectorResult> {
+    const tenantId = this.tenantContext.requireTenantId();
+    const connector = await this.connectors.disable(tenantId, connectorId, actorFromClaims(claims));
+    return toIntegrationConnectorResult(connector);
+  }
+
+  /**
+   * Read-only diagnostic (`:read`, not `:write`) - verifies the stored
+   * credential is present/readable in Vault; see
+   * `IntegrationConnectorsService.testConnection`'s own doc comment for
+   * exactly what this does and does not verify.
+   */
+  @UseGuards(AccessTokenGuard, PermissionsGuard, TenantTokenMatchGuard)
+  @RequirePermissions('integration_connector:read')
+  @Mutation(() => ConnectorTestResultType)
+  async testConnector(@Args('connectorId', { type: () => ID }) connectorId: string): Promise<ConnectorTestResultType> {
+    const tenantId = this.tenantContext.requireTenantId();
+    return this.connectors.testConnection(tenantId, connectorId);
   }
 }

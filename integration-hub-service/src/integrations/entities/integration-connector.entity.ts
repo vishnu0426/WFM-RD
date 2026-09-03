@@ -13,6 +13,8 @@ export enum ConnectorStatus {
   PAUSED = 'paused',
   ERROR = 'error',
   PENDING_SETUP = 'pending_setup',
+  /** Soft-delete terminal state (WP1, Tenant Admin Integration Management) - `agno_integration_hub_app` has no DELETE grant on this table by design (see the initial migration's own grants comment), so "Delete Data Source" transitions status here instead of removing the row. Excluded from default tenant-facing list views; retained for `SyncJob`/`FieldMapping`/`ReasonCode` history integrity. */
+  DISABLED = 'disabled',
 }
 
 export enum SyncJobStatus {

@@ -56,7 +56,7 @@ describe('OAuth authorization-code flow end to end (real Postgres + real Vault +
       token: process.env.VAULT_TOKEN,
       kvMount: process.env.VAULT_KV_MOUNT ?? 'secret',
     });
-    service = new IntegrationConnectorsService(appDataSource, vault, new OAuthTokenExchangeService());
+    service = new IntegrationConnectorsService(appDataSource, vault, new OAuthTokenExchangeService(), { record: async () => undefined } as any);
 
     // A real, generic OAuth 2.0 token endpoint - accepts the exact
     // grant_type=authorization_code exchange RFC 6749 §4.1.3 specifies,

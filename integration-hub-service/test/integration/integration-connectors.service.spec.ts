@@ -46,7 +46,7 @@ describe('IntegrationConnectorsService (real Postgres + real Vault)', () => {
       token: process.env.VAULT_TOKEN,
       kvMount: process.env.VAULT_KV_MOUNT ?? 'secret',
     });
-    service = new IntegrationConnectorsService(appDataSource, vault, new OAuthTokenExchangeService());
+    service = new IntegrationConnectorsService(appDataSource, vault, new OAuthTokenExchangeService(), { record: async () => undefined } as any);
   });
 
   afterAll(async () => {
@@ -165,7 +165,7 @@ describe('IntegrationConnectorsService (real Postgres + real Vault)', () => {
   it('a Vault write failure (e.g. a bad path) never leaves a connector row behind', async () => {
     // Force a failure by pointing at an unreachable Vault for just this call.
     const brokenVault = new VaultClientService({ addr: 'http://127.0.0.1:1', token: 'x', kvMount: 'secret' });
-    const brokenService = new IntegrationConnectorsService(appDataSource, brokenVault, new OAuthTokenExchangeService());
+    const brokenService = new IntegrationConnectorsService(appDataSource, brokenVault, new OAuthTokenExchangeService(), { record: async () => undefined } as any);
 
     await expect(
       brokenService.create(tenantA, {

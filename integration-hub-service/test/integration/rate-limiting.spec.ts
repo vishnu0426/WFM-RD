@@ -206,7 +206,7 @@ describe('§5a rate limiting - real Postgres + real seeded ProviderRateLimitConf
           token: process.env.VAULT_TOKEN!,
           kvMount: process.env.VAULT_KV_MOUNT ?? 'secret',
         });
-        const connectors = new IntegrationConnectorsService(appDataSource, vault, new OAuthTokenExchangeService());
+        const connectors = new IntegrationConnectorsService(appDataSource, vault, new OAuthTokenExchangeService(), { record: async () => undefined } as any);
         const { connector } = await connectors.create(tenantId, {
           connectorType: ConnectorType.HRIS,
           provider: 'Workday',
@@ -246,7 +246,7 @@ describe('§5a rate limiting - real Postgres + real seeded ProviderRateLimitConf
           token: process.env.VAULT_TOKEN!,
           kvMount: process.env.VAULT_KV_MOUNT ?? 'secret',
         });
-        const connectors = new IntegrationConnectorsService(appDataSource, vault, new OAuthTokenExchangeService());
+        const connectors = new IntegrationConnectorsService(appDataSource, vault, new OAuthTokenExchangeService(), { record: async () => undefined } as any);
         const { connector } = await connectors.create(tenantId, {
           connectorType: ConnectorType.HRIS,
           provider: 'Workday',

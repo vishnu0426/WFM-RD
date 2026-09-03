@@ -112,7 +112,7 @@ describe('Webhook delivery (real Postgres + real Vault + real NATS + real local 
       token: process.env.VAULT_TOKEN,
       kvMount: process.env.VAULT_KV_MOUNT ?? 'secret',
     });
-    connectors = new IntegrationConnectorsService(appDataSource, vault, new OAuthTokenExchangeService());
+    connectors = new IntegrationConnectorsService(appDataSource, vault, new OAuthTokenExchangeService(), { record: async () => undefined } as any);
     subscriptions = new WebhookSubscriptionsService(appDataSource, vault);
     deliveries = new WebhookDeliveriesService(appDataSource, migratorPool);
     fanout = new WebhookFanoutService(appDataSource, deliveries);

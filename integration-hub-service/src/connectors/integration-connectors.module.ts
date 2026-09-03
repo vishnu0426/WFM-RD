@@ -3,6 +3,7 @@ import { VaultModule } from '../vault/vault.module';
 import { TenantContextModule } from '../common/tenant/tenant-context.module';
 import { MetricsModule } from '../common/metrics/metrics.module';
 import { AuthModule } from '../auth/auth.module';
+import { AuditGrpcClientModule } from '../grpc/audit-grpc-client.module';
 import { AccessTokenGuard } from '../auth/access-token.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { PlatformAdminGuard } from '../auth/platform-admin.guard';
@@ -22,7 +23,7 @@ import { FieldAuthorityPoliciesService } from './field-authority-policies.servic
   // root service's AnalyticsModule/TenantMonitoringModule already needed;
   // importing AuthModule alone isn't enough, confirmed live here too - the
   // app failed to boot without this).
-  imports: [VaultModule, TenantContextModule, MetricsModule, AuthModule],
+  imports: [VaultModule, TenantContextModule, MetricsModule, AuthModule, AuditGrpcClientModule],
   controllers: [OAuthCallbackController, TenantConnectorsController],
   providers: [
     IntegrationConnectorsService,

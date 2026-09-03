@@ -110,7 +110,7 @@ describe('FieldAuthorityPolicy conflict detection (real Postgres + real Vault + 
       token: process.env.VAULT_TOKEN,
       kvMount: process.env.VAULT_KV_MOUNT ?? 'secret',
     });
-    connectors = new IntegrationConnectorsService(appDataSource, vault, new OAuthTokenExchangeService());
+    connectors = new IntegrationConnectorsService(appDataSource, vault, new OAuthTokenExchangeService(), { record: async () => undefined } as any);
     fieldMappings = new FieldMappingsService(appDataSource);
     fieldAuthorityPolicies = new FieldAuthorityPoliciesService(appDataSource);
     syncJobs = makeRealSyncJobsService(appDataSource);
