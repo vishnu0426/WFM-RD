@@ -507,6 +507,7 @@ enum ProficiencyLevel {
 type Query {
   auditLog(actorType: AuditActorType, before: DateTime, limit: Int, resourceId: String, resourceType: String): [AuditLogEntry!]!
   employee(id: ID!): Employee!
+  employeeDataSources(dataSource: String): [EmployeeDataSource!]!
   employeeGroup(id: ID!): EmployeeGroup!
   employeeGroups(filter: EmployeeGroupFilterInput): [EmployeeGroup!]!
   employeeHistory(employeeId: ID!): [EmployeeHistoryEntry!]!

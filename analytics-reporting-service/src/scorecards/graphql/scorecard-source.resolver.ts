@@ -88,8 +88,8 @@ export class ScorecardSourceResolver {
     @Args('sourceSystemId', { type: () => ID }) sourceSystemId: string,
     @Args('code') code: string,
     @Args('name') name: string,
-    @Args('description', { nullable: true }) description: string | undefined,
-    @Args('unit', { nullable: true }) unit: string | undefined,
+    @Args('description', { type: () => String, nullable: true }) description: string | undefined,
+    @Args('unit', { type: () => String, nullable: true }) unit: string | undefined,
     @CurrentTokenClaims() claims?: AccessTokenClaims,
   ): Promise<ScorecardSourceMeasureResult> {
     const tenantId = this.tenantContext.requireTenantId();
@@ -127,7 +127,7 @@ export class ScorecardSourceResolver {
     @Args('id', { type: () => ID, nullable: true }) id: string | null,
     @Args('sourceSystemId', { type: () => ID }) sourceSystemId: string,
     @Args('code') code: string,
-    @Args('description', { nullable: true }) description: string | undefined,
+    @Args('description', { type: () => String, nullable: true }) description: string | undefined,
     @CurrentTokenClaims() claims?: AccessTokenClaims,
   ): Promise<ScorecardSourceCodeResult> {
     const tenantId = this.tenantContext.requireTenantId();
@@ -160,7 +160,7 @@ export class ScorecardSourceResolver {
     @Args('id', { type: () => ID, nullable: true }) id: string | null,
     @Args('sourceMeasureId', { type: () => ID }) sourceMeasureId: string,
     @Args('targetMetric') targetMetric: string,
-    @Args('description', { nullable: true }) description: string | undefined,
+    @Args('description', { type: () => String, nullable: true }) description: string | undefined,
     @CurrentTokenClaims() claims?: AccessTokenClaims,
   ): Promise<ScorecardSourceMappingResult> {
     const tenantId = this.tenantContext.requireTenantId();
@@ -197,7 +197,7 @@ export class ScorecardSourceResolver {
   async upsertScorecardDimensionType(
     @Args('id', { type: () => ID, nullable: true }) id: string | null,
     @Args('name') name: string,
-    @Args('description', { nullable: true }) description: string | undefined,
+    @Args('description', { type: () => String, nullable: true }) description: string | undefined,
     @CurrentTokenClaims() claims?: AccessTokenClaims,
   ): Promise<ScorecardDimensionTypeResult> {
     const tenantId = this.tenantContext.requireTenantId();

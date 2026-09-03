@@ -15,9 +15,16 @@ type ConnectorHealth {
 
 enum ConnectorStatus {
   ACTIVE
+  DISABLED
   ERROR
   PAUSED
   PENDING_SETUP
+}
+
+type ConnectorTestResult {
+  checkedAt: DateTime!
+  detail: String!
+  ok: Boolean!
 }
 
 enum ConnectorType {
@@ -36,6 +43,22 @@ type CreateConnectorResult {
 type CreateWebhookSubscriptionResult {
   secret: String!
   subscription: WebhookSubscription!
+}
+
+type DataSourceGroup {
+  avgWorkTimeSeconds: Float
+  dataSourceId: ID!
+  description: String
+  id: ID!
+  name: String!
+  type: String
+  updatedAt: DateTime!
+}
+
+type DataSourceGroupQueue {
+  ccQueueId: ID!
+  groupId: ID!
+  id: ID!
 }
 
 """
@@ -83,6 +106,7 @@ type IntegrationConnector {
   lastSyncAt: DateTime
   lastSyncStatus: SyncJobStatus
   provider: String!
+  settings: JSON
   status: ConnectorStatus!
 }
 
@@ -92,23 +116,47 @@ Arbitrary JSON value (object, array, string, number, boolean, or null).
 scalar JSON
 
 type Mutation {
+  addDataSourceGroupQueue(ccQueueId: ID!, groupId: ID!): DataSourceGroupQueue!
   createConnector(additionalConfig: JSON, connectorType: ConnectorType!, credentials: JSON, oauthAuthorizationEndpoint: String, oauthClientId: String, oauthClientSecret: String, oauthRedirectUri: String, oauthScope: String, oauthTokenEndpoint: String, provider: String!): CreateConnectorResult!
   createFieldAuthorityPolicy(authoritativeSource: FieldAuthoritySource!, conflictAction: FieldConflictAction!, connectorId: String!, fieldName: String!): FieldAuthorityPolicy!
   createWebhookSubscription(eventTypes: [String!]!, targetUrl: String!): CreateWebhookSubscriptionResult!
+  deleteConnector(connectorId: ID!): IntegrationConnector!
+  deleteDataSourceGroup(id: ID!): Boolean!
+  deleteReasonCode(id: ID!): Boolean!
+  removeDataSourceGroupQueue(ccQueueId: ID!, groupId: ID!): Boolean!
+  testConnector(connectorId: ID!): ConnectorTestResult!
   testWebhook(subscriptionId: ID!): WebhookDelivery!
   triggerManualSync(connectorId: ID!): SyncJob!
+  updateConnectorSettings(connectorId: ID!, settings: JSON!): IntegrationConnector!
   updateFieldMapping(authority: FieldMappingAuthority, connectorId: String!, sourceField: String!, targetField: String!, transformationRule: JSON): FieldMapping!
+  upsertDataSourceGroup(avgWorkTimeSeconds: Float, dataSourceId: ID!, description: String, id: ID, name: String!, type: String): DataSourceGroup!
+  upsertReasonCode(connectorId: ID!, eventMode: String, eventReason: String, externalId: String!, id: ID, origin: String, reasonCode: String!, shiftOperation: String!): ReasonCode!
 }
 
 type Query {
   connectorHealth(connectorId: ID!): ConnectorHealth!
   connectors: [IntegrationConnector!]!
   connectorsHealth: [ConnectorHealth!]!
+  dataSourceGroupQueues(groupId: ID!): [DataSourceGroupQueue!]!
+  dataSourceGroups(dataSourceId: ID): [DataSourceGroup!]!
   fieldAuthorityPolicies(connectorId: String!): [FieldAuthorityPolicy!]!
   fieldMappings(connectorId: String!): [FieldMapping!]!
+  reasonCodes(connectorId: ID!): [ReasonCode!]!
   syncJobHistory(connectorId: String!, limit: Float): [SyncJob!]!
   webhookDeliveries(limit: Float, subscriptionId: ID!): [WebhookDelivery!]!
   webhookSubscriptions: [WebhookSubscription!]!
+}
+
+type ReasonCode {
+  connectorId: ID!
+  eventMode: String
+  eventReason: String
+  externalId: String!
+  id: ID!
+  origin: String
+  reasonCode: String!
+  shiftOperation: String!
+  updatedAt: DateTime!
 }
 
 type SyncJob {
@@ -126,6 +174,7 @@ type SyncJob {
 }
 
 enum SyncJobStatus {
+  CANCELLED
   COMPLETED
   FAILED
   PARTIAL_FAILURE

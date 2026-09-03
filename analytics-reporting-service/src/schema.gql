@@ -112,7 +112,19 @@ type Mutation {
   askAnalyticsQuestion(question: String!): AnalyticsAnswer!
   createDashboard(input: CreateDashboardInputType!): Dashboard!
   createMetricDefinition(input: CreateMetricDefinitionInputType!): MetricDefinition!
+  deleteScorecardDimensionMember(id: ID!): Boolean!
+  deleteScorecardDimensionType(id: ID!): Boolean!
+  deleteScorecardSourceCode(id: ID!): Boolean!
+  deleteScorecardSourceMapping(id: ID!): Boolean!
+  deleteScorecardSourceMeasure(id: ID!): Boolean!
+  deleteScorecardSourceSystem(id: ID!): Boolean!
   updateDashboard(id: ID!, input: CreateDashboardInputType!): Dashboard!
+  upsertScorecardDimensionMember(code: String!, dimensionTypeId: ID!, id: ID, name: String!): ScorecardDimensionMember!
+  upsertScorecardDimensionType(description: String, id: ID, name: String!): ScorecardDimensionType!
+  upsertScorecardSourceCode(code: String!, description: String, id: ID, sourceSystemId: ID!): ScorecardSourceCode!
+  upsertScorecardSourceMapping(description: String, id: ID, sourceMeasureId: ID!, targetMetric: String!): ScorecardSourceMapping!
+  upsertScorecardSourceMeasure(code: String!, description: String, id: ID, name: String!, sourceSystemId: ID!, unit: String): ScorecardSourceMeasure!
+  upsertScorecardSourceSystem(connectorId: ID, id: ID, name: String!, provider: String!): ScorecardSourceSystem!
 }
 
 type Query {
@@ -121,4 +133,65 @@ type Query {
   metricDefinitions: [MetricDefinition!]!
   metricQuery(filter: MetricQueryFilterInputType, metricName: String!): [MetricResult!]!
   myDashboards: [Dashboard!]!
+  scorecardDimensionMembers(dimensionTypeId: ID!): [ScorecardDimensionMember!]!
+  scorecardDimensionTypes: [ScorecardDimensionType!]!
+  scorecardSourceCodes(sourceSystemId: ID!): [ScorecardSourceCode!]!
+  scorecardSourceMappings(sourceMeasureId: ID!): [ScorecardSourceMapping!]!
+  scorecardSourceMeasures(sourceSystemId: ID!): [ScorecardSourceMeasure!]!
+  scorecardSourceSystems: [ScorecardSourceSystem!]!
+}
+
+type ScorecardDimensionMember {
+  code: String!
+  dimensionTypeId: ID!
+  id: ID!
+  name: String!
+  updatedAt: DateTime!
+}
+
+type ScorecardDimensionType {
+  description: String
+  id: ID!
+  name: String!
+  updatedAt: DateTime!
+}
+
+type ScorecardSourceCode {
+  code: String!
+  description: String
+  id: ID!
+  sourceSystemId: ID!
+  updatedAt: DateTime!
+}
+
+type ScorecardSourceMapping {
+  description: String
+  id: ID!
+  sourceMeasureId: ID!
+  targetMetric: String!
+  updatedAt: DateTime!
+}
+
+type ScorecardSourceMeasure {
+  code: String!
+  description: String
+  id: ID!
+  name: String!
+  sourceSystemId: ID!
+  unit: String
+  updatedAt: DateTime!
+}
+
+type ScorecardSourceSystem {
+  connectorId: ID
+  id: ID!
+  name: String!
+  provider: String!
+  status: ScorecardSourceSystemStatus!
+  updatedAt: DateTime!
+}
+
+enum ScorecardSourceSystemStatus {
+  ACTIVE
+  INACTIVE
 }

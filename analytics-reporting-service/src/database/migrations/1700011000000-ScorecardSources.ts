@@ -60,6 +60,7 @@ export class ScorecardSources1700011000000 implements MigrationInterface {
         created_at         timestamptz NOT NULL DEFAULT now(),
         updated_at         timestamptz NOT NULL DEFAULT now(),
         PRIMARY KEY (id),
+        UNIQUE (tenant_id, id),
         UNIQUE (source_system_id, code),
         CONSTRAINT scorecard_source_measure_system_fk
           FOREIGN KEY (tenant_id, source_system_id)

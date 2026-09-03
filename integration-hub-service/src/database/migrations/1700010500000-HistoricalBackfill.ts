@@ -27,6 +27,18 @@ export class HistoricalBackfill1700010500000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     const tenantIdExpr = `current_setting('app.current_tenant_id', true)::uuid`;
 
+    // The initial schema gave `sync_job` only `PRIMARY KEY (id)` - no
+    // `UNIQUE (tenant_id, id)` (unlike `integration_connector`, which has
+    // one). `historical_backfill_chunk` below needs to reference
+    // `sync_job (tenant_id, id)` as a composite FK (ADR-0004's own
+    // denormalized-tenant-id convention, same as `field_mapping`/`sync_job`
+    // itself referencing `integration_connector`), which Postgres requires
+    // a matching unique constraint for.
+    await queryRunner.query(`
+      ALTER TABLE integration_hub.sync_job
+      ADD CONSTRAINT sync_job_tenant_id_id_unique UNIQUE (tenant_id, id);
+    `);
+
     await queryRunner.query(`
       ALTER TABLE integration_hub.sync_job
       DROP CONSTRAINT sync_job_sync_type_check;
@@ -109,6 +121,10 @@ export class HistoricalBackfill1700010500000 implements MigrationInterface {
     await queryRunner.query(`
       ALTER TABLE integration_hub.sync_job
       DROP CONSTRAINT IF EXISTS sync_job_historical_range_check;
+    `);
+    await queryRunner.query(`
+      ALTER TABLE integration_hub.sync_job
+      DROP CONSTRAINT IF EXISTS sync_job_tenant_id_id_unique;
     `);
     await queryRunner.query(`
       ALTER TABLE integration_hub.sync_job
