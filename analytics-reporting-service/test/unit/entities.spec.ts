@@ -14,11 +14,11 @@ import { entities } from '../../src/database/entities';
  * TypeScript compile alone would not.
  */
 describe('database entities', () => {
-  it('registers all nine entities as of Phase 6, six scoped to analytics_mv', () => {
-    expect(entities).toHaveLength(9);
+  it('registers all nine entities as of Phase 6 plus WP6\'s six Scorecard* entities, six scoped to analytics_mv', () => {
+    expect(entities).toHaveLength(15);
     const entitySet = new Set<unknown>(entities);
     const tables = getMetadataArgsStorage().tables.filter((t) => entitySet.has(t.target));
-    expect(tables).toHaveLength(9);
+    expect(tables).toHaveLength(15);
     const byName = new Map(tables.map((t) => [t.name, t.schema]));
     expect(byName.get('saved_report')).toBe('analytics');
     expect(byName.get('metric_definition')).toBe('analytics');
@@ -29,6 +29,12 @@ describe('database entities', () => {
     expect(byName.get('mv_forecast_accuracy_trend')).toBe('analytics_mv');
     expect(byName.get('mv_cost_vs_budget')).toBe('analytics_mv');
     expect(byName.get('mv_attrition_by_site')).toBe('analytics_mv');
+    expect(byName.get('scorecard_source_system')).toBe('analytics');
+    expect(byName.get('scorecard_source_measure')).toBe('analytics');
+    expect(byName.get('scorecard_source_code')).toBe('analytics');
+    expect(byName.get('scorecard_source_mapping')).toBe('analytics');
+    expect(byName.get('scorecard_dimension_type')).toBe('analytics');
+    expect(byName.get('scorecard_dimension_member')).toBe('analytics');
   });
 
   it('AnalyticsExportStatus matches pending/completed/failed exactly', () => {

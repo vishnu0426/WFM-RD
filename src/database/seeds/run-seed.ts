@@ -206,6 +206,10 @@ const RESOURCES = [
   // WP5: Historical Import/Backfill (integration-hub-service) - real
   // `:read`/`:write` mutations on `POST/GET .../historical-imports`.
   'historical_import',
+  // WP6: Scorecards Sources (analytics-reporting-service) - one resource
+  // covering all six Scorecard* entities' real `:read`/`:write`/`:delete`
+  // GraphQL operations (`ScorecardSourceResolver`).
+  'scorecard_source',
 ] as const;
 
 /**

@@ -7,6 +7,7 @@ import { DomainError } from '../common/errors/domain-error';
 import { TenantContextModule } from '../common/tenant/tenant-context.module';
 import { MetricsModule } from '../common/metrics/metrics.module';
 import { AnalyticsModule } from '../analytics/analytics.module';
+import { ScorecardsModule } from '../scorecards/scorecards.module';
 import { AuthModule } from '../auth/auth.module';
 import { AccessTokenGuard } from '../auth/access-token.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
@@ -14,6 +15,7 @@ import { TenantTokenMatchGuard } from '../auth/tenant-token-match.guard';
 import { JsonScalar } from './json.scalar';
 import { DashboardResolver } from './resolvers/dashboard.resolver';
 import { MetricResolver } from './resolvers/metric.resolver';
+import { ScorecardSourceResolver } from '../scorecards/graphql/scorecard-source.resolver';
 
 /** GraphQL-side counterpart to `DomainErrorFilter` (REST) - own copy of adherence-compliance-service's/shift-marketplace-service's `formatGraphQLError`. */
 function formatGraphQLError(formattedError: GraphQLFormattedError, error: unknown): GraphQLFormattedError {
@@ -56,12 +58,14 @@ function formatGraphQLError(formattedError: GraphQLFormattedError, error: unknow
     TenantContextModule,
     MetricsModule,
     AnalyticsModule,
+    ScorecardsModule,
     AuthModule,
   ],
   providers: [
     JsonScalar,
     DashboardResolver,
     MetricResolver,
+    ScorecardSourceResolver,
     // Re-provided here alongside AuthModule (which also provides+exports
     // them) - same fix adherence-compliance-service's/ai-layer-service's
     // own GraphQL modules already document: NestJS resolves a class
