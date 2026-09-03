@@ -21,11 +21,11 @@ import { entities } from '../../src/database/entities';
  * TypeScript compile alone would not.
  */
 describe('database entities', () => {
-  it('registers all seven §2.1 entities plus WP3\'s ReasonCode/DataSourceGroup/DataSourceGroupQueue, scoped to the integration_hub schema', () => {
-    expect(entities).toHaveLength(10);
+  it('registers all seven §2.1 entities plus WP3\'s ReasonCode/DataSourceGroup/DataSourceGroupQueue and WP5\'s HistoricalBackfillChunk, scoped to the integration_hub schema', () => {
+    expect(entities).toHaveLength(11);
     const entitySet = new Set<unknown>(entities);
     const tables = getMetadataArgsStorage().tables.filter((t) => entitySet.has(t.target));
-    expect(tables).toHaveLength(10);
+    expect(tables).toHaveLength(11);
     for (const table of tables) {
       expect(table.schema).toBe('integration_hub');
     }
@@ -41,14 +41,14 @@ describe('database entities', () => {
     );
   });
 
-  it("SyncJobStatus matches §2.1's enum exactly (shared by IntegrationConnector.lastSyncStatus and SyncJob.status)", () => {
+  it("SyncJobStatus matches §2.1's enum plus WP5's 'cancelled' state (sync_job.status only - IntegrationConnector.last_sync_status_check keeps its original five values)", () => {
     expect(Object.values(SyncJobStatus).sort()).toEqual(
-      ['completed', 'failed', 'partial_failure', 'queued', 'running'].sort(),
+      ['cancelled', 'completed', 'failed', 'partial_failure', 'queued', 'running'].sort(),
     );
   });
 
-  it("SyncType matches §2.1's enum exactly, including v2's streaming addition", () => {
-    expect(Object.values(SyncType).sort()).toEqual(['full', 'incremental', 'streaming'].sort());
+  it("SyncType matches §2.1's enum plus v2's streaming addition and WP5's historical addition", () => {
+    expect(Object.values(SyncType).sort()).toEqual(['full', 'historical', 'incremental', 'streaming'].sort());
   });
 
   it("FieldMappingAuthority matches §5b's enum exactly", () => {

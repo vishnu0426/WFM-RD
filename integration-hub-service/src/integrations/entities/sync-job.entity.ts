@@ -5,6 +5,8 @@ export enum SyncType {
   FULL = 'full',
   INCREMENTAL = 'incremental',
   STREAMING = 'streaming',
+  /** WP5 (Historical Import/Backfill) - date-ranged, chunked (see `HistoricalBackfillChunk`), resumable. */
+  HISTORICAL = 'historical',
 }
 
 /**
@@ -54,4 +56,27 @@ export class SyncJob {
   /** §5a: set while this (still `RUNNING`) job is mid-retry in `withBackoffRetry`'s reactive backoff - never cleared explicitly, only ever meaningful while `status === RUNNING`. See migration `SyncJobRateLimitedUntil1700010200000`'s own doc comment. */
   @Column('timestamptz', { name: 'rate_limited_until', nullable: true })
   rateLimitedUntil!: Date | null;
+
+  // ---------------------------------------------------------------------
+  // WP5 (Historical Import/Backfill) - only meaningful/non-null for
+  // `syncType: historical` rows (enforced by
+  // `sync_job_historical_range_check`). See `HistoricalBackfillChunk` for
+  // the per-chunk breakdown of a historical job's own date range.
+  // ---------------------------------------------------------------------
+
+  /** Which historical dataset this job imports - provider/adapter-defined, e.g. "call_volume_intervals". */
+  @Column('varchar', { name: 'dataset_key', nullable: true })
+  datasetKey!: string | null;
+
+  @Column('date', { name: 'range_start', nullable: true })
+  rangeStart!: string | null;
+
+  @Column('date', { name: 'range_end', nullable: true })
+  rangeEnd!: string | null;
+
+  @Column('integer', { name: 'records_found', nullable: true })
+  recordsFound!: number | null;
+
+  @Column('integer', { name: 'records_duplicate', nullable: true })
+  recordsDuplicate!: number | null;
 }

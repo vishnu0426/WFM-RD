@@ -203,6 +203,9 @@ const RESOURCES = [
   // symmetry only.
   'reason_code',
   'data_source_group',
+  // WP5: Historical Import/Backfill (integration-hub-service) - real
+  // `:read`/`:write` mutations on `POST/GET .../historical-imports`.
+  'historical_import',
 ] as const;
 
 /**

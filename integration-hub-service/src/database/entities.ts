@@ -8,13 +8,15 @@ import { FieldAuthorityPolicy } from '../integrations/entities/field-authority-p
 import { ReasonCode } from '../integrations/entities/reason-code.entity';
 import { DataSourceGroup } from '../integrations/entities/data-source-group.entity';
 import { DataSourceGroupQueue } from '../integrations/entities/data-source-group-queue.entity';
+import { HistoricalBackfillChunk } from '../integrations/entities/historical-backfill-chunk.entity';
 
 /**
  * Single source of truth for "every entity in this service," consumed by
  * both the NestJS `TypeOrmModule` registration and the CLI `DataSource`
  * used for migrations - same convention as every other service's own
  * `src/database/entities.ts`. `ReasonCode`/`DataSourceGroup`/
- * `DataSourceGroupQueue` added by Tenant Admin Integration Management WP3.
+ * `DataSourceGroupQueue` added by Tenant Admin Integration Management WP3,
+ * `HistoricalBackfillChunk` by WP5.
  */
 export const entities = [
   IntegrationConnector,
@@ -27,6 +29,7 @@ export const entities = [
   ReasonCode,
   DataSourceGroup,
   DataSourceGroupQueue,
+  HistoricalBackfillChunk,
 ];
 
 export {
@@ -40,4 +43,5 @@ export {
   ReasonCode,
   DataSourceGroup,
   DataSourceGroupQueue,
+  HistoricalBackfillChunk,
 };

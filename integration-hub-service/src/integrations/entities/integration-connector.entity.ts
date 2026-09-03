@@ -23,6 +23,8 @@ export enum SyncJobStatus {
   COMPLETED = 'completed',
   FAILED = 'failed',
   PARTIAL_FAILURE = 'partial_failure',
+  /** WP5 (Historical Import/Backfill) only - `sync_job.status` alone widened to allow this (see migration `HistoricalBackfill1700010500000`); `integration_connector.last_sync_status` still only accepts the original five values, and nothing ever writes CANCELLED there. */
+  CANCELLED = 'cancelled',
 }
 
 /**

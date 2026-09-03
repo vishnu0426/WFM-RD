@@ -6,7 +6,11 @@ import { VaultModule } from '../vault/vault.module';
 import { IntegrationConnectorsModule } from '../connectors/integration-connectors.module';
 import { WebhooksModule } from '../webhooks/webhooks.module';
 import { AuthModule } from '../auth/auth.module';
+import { AuditGrpcClientModule } from '../grpc/audit-grpc-client.module';
 import { migratorPoolProvider } from '../database/migrator-pool.provider';
+import { HistoricalAdapterRegistry } from './historical/historical-adapter-registry.service';
+import { HistoricalBackfillRunnerService } from './historical/historical-backfill-runner.service';
+import { HistoricalImportController } from './historical/historical-import.controller';
 import { SyncJobsService } from './sync-jobs.service';
 import { ProviderRateLimitConfigService } from './provider-rate-limit-config.service';
 import { BATCH_CONNECTOR_ADAPTERS } from './batch/batch-connector-adapter';
@@ -50,11 +54,14 @@ import { AvayaAuraAdapter } from './relay/providers/avaya-aura.adapter';
     IntegrationConnectorsModule,
     WebhooksModule,
     AuthModule,
+    AuditGrpcClientModule,
   ],
-  controllers: [BatchSyncController, RelayController],
+  controllers: [BatchSyncController, RelayController, HistoricalImportController],
   providers: [
     migratorPoolProvider,
     SyncJobsService,
+    HistoricalAdapterRegistry,
+    HistoricalBackfillRunnerService,
     ProviderRateLimitConfigService,
     RateLimiterService,
     BulkImportClientService,
