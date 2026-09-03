@@ -30,6 +30,7 @@ def _to_response(row: CcQueue) -> CcQueueResponse:
         channel=row.channel,
         routing_config=row.routing_config,
         status=row.status,
+        data_source_id=row.data_source_id,
     )
 
 
@@ -49,6 +50,7 @@ async def create_cc_queue(
         channel=body.channel,
         routing_config=body.routing_config,
         status=body.status,
+        data_source_id=body.data_source_id,
     )
     return _to_response(row)
 
@@ -56,11 +58,15 @@ async def create_cc_queue(
 @router.get("", response_model=list[CcQueueResponse])
 async def list_cc_queues(
     org_unit_id: uuid.UUID | None = Query(default=None),
+    data_source_id: uuid.UUID | None = Query(default=None),
     context: TenantContext = Depends(get_tenant_context),
     session: AsyncSession = Depends(get_db_session),
 ) -> list[CcQueueResponse]:
     rows = await cc_queue_service.list_cc_queues(
-        session, tenant_id=uuid.UUID(context.tenant_id), org_unit_id=org_unit_id
+        session,
+        tenant_id=uuid.UUID(context.tenant_id),
+        org_unit_id=org_unit_id,
+        data_source_id=data_source_id,
     )
     return [_to_response(row) for row in rows]
 
@@ -107,6 +113,7 @@ async def update_cc_queue(
         channel=body.channel,
         routing_config=body.routing_config,
         status=body.status,
+        data_source_id=body.data_source_id,
     )
     return _to_response(row)
 

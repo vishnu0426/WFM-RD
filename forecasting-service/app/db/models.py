@@ -247,6 +247,10 @@ class CcQueue(Base):
     channel: Mapped[str] = mapped_column(String(16), nullable=False, default="voice")
     routing_config: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="active")
+    # Tenant Admin Integration Management WP4: bare cross-service reference
+    # to integration-hub-service's `integration_connector.id` - see the
+    # 0013 migration's own doc comment for why this is not a real FK.
+    data_source_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 

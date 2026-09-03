@@ -100,6 +100,10 @@ class CcQueueRequest(CamelModel):
     channel: str = Field(default="voice", pattern="^(voice|chat|email|sms|social)$")
     routing_config: dict[str, object] = Field(default_factory=dict)
     status: str = Field(default="active", pattern="^(active|inactive)$")
+    # Tenant Admin Integration Management WP4: bare cross-service reference
+    # to integration-hub-service's `integration_connector.id` (Data
+    # Source). See `CcQueue.data_source_id`'s own doc comment.
+    data_source_id: uuid.UUID | None = Field(default=None)
 
 
 class CcQueueResponse(CcQueueRequest):

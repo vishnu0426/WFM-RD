@@ -25,6 +25,7 @@ async def create_cc_queue(
     channel: str,
     routing_config: dict[str, object],
     status: str,
+    data_source_id: uuid.UUID | None = None,
 ) -> CcQueue:
     now = datetime.now(UTC)
     row = CcQueue(
@@ -37,6 +38,7 @@ async def create_cc_queue(
         channel=channel,
         routing_config=routing_config,
         status=status,
+        data_source_id=data_source_id,
         created_at=now,
         updated_at=now,
     )
@@ -46,11 +48,17 @@ async def create_cc_queue(
 
 
 async def list_cc_queues(
-    session: AsyncSession, *, tenant_id: uuid.UUID, org_unit_id: uuid.UUID | None = None
+    session: AsyncSession,
+    *,
+    tenant_id: uuid.UUID,
+    org_unit_id: uuid.UUID | None = None,
+    data_source_id: uuid.UUID | None = None,
 ) -> list[CcQueue]:
     stmt = select(CcQueue).where(CcQueue.tenant_id == tenant_id)
     if org_unit_id is not None:
         stmt = stmt.where(CcQueue.org_unit_id == org_unit_id)
+    if data_source_id is not None:
+        stmt = stmt.where(CcQueue.data_source_id == data_source_id)
     stmt = stmt.order_by(CcQueue.created_at.desc())
     return list((await session.scalars(stmt)).all())
 
@@ -89,6 +97,7 @@ async def update_cc_queue(
     channel: str,
     routing_config: dict[str, object],
     status: str,
+    data_source_id: uuid.UUID | None = None,
 ) -> CcQueue:
     row = await get_cc_queue(session, tenant_id=tenant_id, queue_id=queue_id)
     row.org_unit_id = org_unit_id
@@ -98,6 +107,7 @@ async def update_cc_queue(
     row.channel = channel
     row.routing_config = routing_config
     row.status = status
+    row.data_source_id = data_source_id
     row.updated_at = datetime.now(UTC)
     await session.flush()
     return row
