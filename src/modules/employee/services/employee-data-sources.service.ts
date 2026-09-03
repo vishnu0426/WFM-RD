@@ -31,6 +31,11 @@ export class EmployeeDataSourcesService {
     return this.repository.findForEmployees(employeeIds);
   }
 
+  /** WP2: tenant-wide Agent Mapping listing, optionally filtered to one external data source/connector. */
+  async findAllForTenant(dataSource?: string): Promise<EmployeeDataSource[]> {
+    return this.repository.findAllForTenant(dataSource);
+  }
+
   async create(input: CreateEmployeeDataSourceInput): Promise<EmployeeDataSource> {
     await this.employeesService.findById(input.employeeId);
     try {

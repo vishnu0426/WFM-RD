@@ -193,6 +193,16 @@ const RESOURCES = [
   // `analytics_export:write`/`:read`.
   'metric_definition',
   'analytics_export',
+  // Tenant Admin Integration Management, WP2/WP3: `agent_mapping` reuses
+  // the existing `employee`/`employee:read`/`employee:write` permissions
+  // (`EmployeeDataSource` is an employee sub-resource, same precedent as
+  // schedule preference/interactions/skills) - no new resource needed for
+  // it. `reason_code`/`data_source_group` are genuinely new domains
+  // (integration-hub-service) with real `:read`/`:write`/`:delete`
+  // mutations, unlike most resources here where `:delete` is generated for
+  // symmetry only.
+  'reason_code',
+  'data_source_group',
 ] as const;
 
 /**
