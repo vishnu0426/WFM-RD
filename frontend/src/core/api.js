@@ -234,6 +234,8 @@ export const Api = (() => {
   }
   const gqlFetch = (query, variables) => gqlFetchAt(CFG.rootBaseUrl, query, variables);
   const integrationHubGql = (query, variables) => gqlFetchAt(CFG.integrationHubBaseUrl, query, variables);
+  /* Scorecards Sources (Tenant Admin Integration Management WP6) is the first screen to call analytics-reporting-service's GraphQL schema. */
+  const analyticsGql = (query, variables) => gqlFetchAt(CFG.analyticsBaseUrl, query, variables);
 
   /* ---------- CSV export helper (client-side, no backend endpoint) ---------- */
   function downloadCsv(filename, rows, columns) {
@@ -272,6 +274,7 @@ export const Api = (() => {
     gqlFetch,
     gqlFetchAt,
     integrationHubGql,
+    analyticsGql,
     downloadCsv,
   };
 })();

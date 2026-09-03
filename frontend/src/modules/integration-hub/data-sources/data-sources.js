@@ -1,0 +1,336 @@
+/* Data Sources → Settings. Real backend: IntegrationConnector via
+   integration-hub-service's GraphQL (connectors/createConnector/
+   updateConnectorSettings/deleteConnector/testConnector — all real as of
+   WP1). Consolidates and retires the old System Configuration → Data
+   Sources screen (identity-org/system-config/data-sources.js) — same
+   entity, same API, one screen instead of two confusingly similar ones. */
+import { Api } from '../../../core/api.js';
+import { esc, errMsg } from '../../../core/dom.js';
+import { doRerender } from '../../../app/rerender.js';
+import { toast } from '../../../app/toast.js';
+import { pageHead, sec, empty, stBadge, drawerShell, fmtDt, gap } from '../../identity-org/shared/ui.js';
+
+const CONNECTOR_TYPES = ['HRIS', 'PAYROLL', 'ACD', 'CRM', 'CUSTOM_WEBHOOK'];
+const BATCH_TYPES = new Set(['HRIS', 'PAYROLL', 'CRM']);
+const ACD_TYPES = new Set(['ACD']);
+
+const LIST_QUERY = `query { connectors { id connectorType provider status lastSyncAt lastSyncStatus settings } }`;
+const CREATE_MUTATION = `mutation Create(
+  $connectorType: ConnectorType!, $provider: String!, $credentials: JSON,
+  $oauthClientId: String, $oauthClientSecret: String, $oauthAuthorizationEndpoint: String,
+  $oauthTokenEndpoint: String, $oauthRedirectUri: String, $oauthScope: String
+) {
+  createConnector(
+    connectorType: $connectorType, provider: $provider, credentials: $credentials,
+    oauthClientId: $oauthClientId, oauthClientSecret: $oauthClientSecret,
+    oauthAuthorizationEndpoint: $oauthAuthorizationEndpoint, oauthTokenEndpoint: $oauthTokenEndpoint,
+    oauthRedirectUri: $oauthRedirectUri, oauthScope: $oauthScope
+  ) { authorizationUrl connector { id connectorType provider status } }
+}`;
+const UPDATE_SETTINGS_MUTATION = `mutation UpdateSettings($connectorId: ID!, $settings: JSON!) {
+  updateConnectorSettings(connectorId: $connectorId, settings: $settings) { id settings }
+}`;
+const DELETE_MUTATION = `mutation Delete($connectorId: ID!) { deleteConnector(connectorId: $connectorId) { id status } }`;
+const TEST_MUTATION = `mutation Test($connectorId: ID!) { testConnector(connectorId: $connectorId) { ok checkedAt detail } }`;
+
+const SETTINGS_FIELDS = [
+  { id: 'name', label: 'Name', type: 'text' },
+  { id: 'description', label: 'Description', type: 'text' },
+  { id: 'timeZone', label: 'Time Zone', type: 'text', placeholder: 'e.g. America/New_York' },
+  { id: 'useAcdStaffing', label: 'Use ACD Staffing', type: 'checkbox' },
+  { id: 'externalName', label: 'External Name', type: 'text' },
+  { id: 'contactViewerServerName', label: 'Contact Viewer Server Name', type: 'text' },
+  { id: 'contactViewerServerPort', label: 'Contact Viewer Server Port', type: 'number' },
+  { id: 'contactViewerUrlOverride', label: 'Contact Viewer URL Override', type: 'text' },
+];
+
+function loadConnectors(state) {
+  state.wf.connectors = { loading: true };
+  Api.integrationHubGql(LIST_QUERY, {})
+    .then((data) => {
+      state.wf.connectors = { rows: data.connectors };
+      doRerender();
+    })
+    .catch((err) => {
+      state.wf.connectors = { error: errMsg(err) };
+      doRerender();
+    });
+}
+
+function emptyConnectorDraft() {
+  return {
+    connectorType: CONNECTOR_TYPES[0],
+    provider: '',
+    authMode: 'credentials',
+    credentialsJson: '{\n  \n}',
+    oauthClientId: '',
+    oauthClientSecret: '',
+    oauthAuthorizationEndpoint: '',
+    oauthTokenEndpoint: '',
+    oauthRedirectUri: '',
+    oauthScope: '',
+  };
+}
+
+function settingsDraftFrom(connector) {
+  const s = connector.settings || {};
+  const d = {};
+  SETTINGS_FIELDS.forEach((f) => {
+    d[f.id] = f.type === 'checkbox' ? !!s[f.id] : (s[f.id] ?? '');
+  });
+  return d;
+}
+
+function filteredRows(state, rows) {
+  const q = (state.dsSearch || '').toLowerCase();
+  return rows.filter((c) => {
+    if (state.dsTypeFilter && c.connectorType !== state.dsTypeFilter) return false;
+    if (state.dsStatusFilter && c.status !== state.dsStatusFilter) return false;
+    if (q && !`${c.provider} ${c.connectorType}`.toLowerCase().includes(q)) return false;
+    return true;
+  });
+}
+
+export function render(state) {
+  if (!state.wf.connectors) loadConnectors(state);
+  const list = state.wf.connectors;
+  const body = !list || list.loading
+    ? `<div class="panel"><div style="padding:16px"><div class="skel" style="height:24px"></div></div></div>`
+    : list.error
+      ? `<p class="muted">${esc(list.error)}</p>`
+      : list.rows.length === 0
+        ? empty('No data sources yet.', 'Connect an HRIS, payroll, ACD, or CRM system to bring real data into WFM.', `<button class="btn btn-primary" data-wf="ds-connector-open">+ New Data Source</button>`)
+        : (() => {
+            const rows = filteredRows(state, list.rows);
+            return `<table class="data"><thead><tr><th>Type</th><th>Provider</th><th>Status</th><th>Time Zone</th><th>Last Sync</th><th></th></tr></thead><tbody>
+              ${rows.map((c) => `<tr>
+                <td class="mono">${esc(c.connectorType)}</td>
+                <td>${esc(c.provider)}</td>
+                <td>${stBadge(c.status)}</td>
+                <td>${esc((c.settings && c.settings.timeZone) || '—')}</td>
+                <td>${c.lastSyncAt ? `${fmtDt(c.lastSyncAt)} (${esc(c.lastSyncStatus || '—')})` : '—'}</td>
+                <td class="row-actions">
+                  <button class="btn btn-sm" data-wf="ds-view" data-id="${c.id}">View</button>
+                  <button class="btn btn-sm" data-wf="ds-test" data-id="${c.id}">Test Connection</button>
+                  ${BATCH_TYPES.has(c.connectorType) ? `<button class="btn btn-sm" data-wf="ds-sync" data-id="${c.id}">Sync</button>` : ''}
+                  <button class="btn btn-sm btn-danger" data-wf="ds-delete" data-id="${c.id}">Delete</button>
+                </td>
+              </tr>`).join('')}
+            </tbody></table>`;
+          })();
+  return `
+    ${pageHead('Data Sources', 'Tenant integration connectors — HRIS, payroll, ACD, CRM, and custom webhook systems.', `<button class="btn btn-primary" data-wf="ds-connector-open">+ New Data Source</button>`)}
+    ${sec('Data Sources', `
+      <div class="toolbar">
+        <input class="search" placeholder="Search provider/type…" data-wf="ds-search" value="${esc(state.dsSearch || '')}" />
+        <select data-wf="ds-type-filter"><option value="">All types</option>${CONNECTOR_TYPES.map((t) => `<option value="${t}" ${state.dsTypeFilter === t ? 'selected' : ''}>${t}</option>`).join('')}</select>
+        <select data-wf="ds-status-filter"><option value="">All statuses</option>${['active', 'paused', 'error', 'pending_setup', 'disabled'].map((s) => `<option value="${s}" ${state.dsStatusFilter === s ? 'selected' : ''}>${s}</option>`).join('')}</select>
+        <button class="btn" data-wf="ds-refresh">Refresh</button>
+      </div>
+      ${body}
+    `, `<span class="meta">GraphQL: connectors</span>`)}`;
+}
+
+function testResultBadge(result) {
+  if (!result) return '';
+  return `<div class="hint" style="margin-top:10px">${result.ok ? '<span class="badge badge-ok">Connection OK</span>' : '<span class="badge badge-danger">Connection failed</span>'} ${esc(result.detail)} <span class="muted">(checked ${fmtDt(result.checkedAt)})</span></div>`;
+}
+
+export function renderDrawer(state) {
+  if (state.drawer === 'ds-connector') {
+    const d = state.dsConnectorDraft;
+    const saving = state.wf.saving.dsConnector;
+    return drawerShell(
+      'New Data Source',
+      'GraphQL: createConnector — exactly one of credentials or OAuth is required',
+      `
+      <div class="grid-2">
+        <div class="field"><label>Type</label>
+          <select data-wf="ds-connector-field" data-id="connectorType">${CONNECTOR_TYPES.map((t) => `<option value="${t}" ${d.connectorType === t ? 'selected' : ''}>${t}</option>`).join('')}</select>
+        </div>
+        <div class="field"><label>Provider</label><input data-wf="ds-connector-field" data-id="provider" placeholder="e.g. workday, adp, salesforce" value="${esc(d.provider)}" /></div>
+      </div>
+      <div class="field" style="margin-top:10px"><label>Authentication</label>
+        <select data-wf="ds-connector-field" data-id="authMode">
+          <option value="credentials" ${d.authMode === 'credentials' ? 'selected' : ''}>API credentials</option>
+          <option value="oauth" ${d.authMode === 'oauth' ? 'selected' : ''}>OAuth</option>
+        </select>
+      </div>
+      ${d.authMode === 'credentials' ? `
+        <div class="field" style="margin-top:10px"><label>Credentials (JSON — no fixed schema per provider)</label>
+          <textarea data-wf="ds-connector-field" data-id="credentialsJson" rows="5" class="mono">${esc(d.credentialsJson)}</textarea>
+        </div>` : `
+        <div class="grid-2" style="margin-top:10px">
+          <div class="field"><label>OAuth client ID</label><input data-wf="ds-connector-field" data-id="oauthClientId" value="${esc(d.oauthClientId)}" /></div>
+          <div class="field"><label>OAuth client secret</label><input data-wf="ds-connector-field" data-id="oauthClientSecret" type="password" value="${esc(d.oauthClientSecret)}" /></div>
+        </div>
+        <div class="field" style="margin-top:10px"><label>Authorization endpoint</label><input data-wf="ds-connector-field" data-id="oauthAuthorizationEndpoint" value="${esc(d.oauthAuthorizationEndpoint)}" /></div>
+        <div class="field" style="margin-top:10px"><label>Token endpoint</label><input data-wf="ds-connector-field" data-id="oauthTokenEndpoint" value="${esc(d.oauthTokenEndpoint)}" /></div>
+        <div class="field" style="margin-top:10px"><label>Redirect URI</label><input data-wf="ds-connector-field" data-id="oauthRedirectUri" value="${esc(d.oauthRedirectUri)}" /></div>
+        <div class="field" style="margin-top:10px"><label>Scope</label><input data-wf="ds-connector-field" data-id="oauthScope" value="${esc(d.oauthScope)}" /></div>`}
+      `,
+      `<button class="btn" data-wf="close-drawer">Cancel</button>`,
+      `<button class="btn btn-primary" data-wf="ds-connector-go" ${saving ? 'disabled' : ''}>${saving ? 'Creating…' : 'Create'}</button>`,
+    );
+  }
+  if (state.drawer === 'ds-detail') {
+    const list = state.wf.connectors;
+    const connector = list && list.rows ? list.rows.find((c) => c.id === state.dsDetailId) : null;
+    if (!connector) return '';
+    if (!state.dsSettingsDraft) state.dsSettingsDraft = settingsDraftFrom(connector);
+    const d = state.dsSettingsDraft;
+    const saved = settingsDraftFrom(connector);
+    const dirty = JSON.stringify(d) !== JSON.stringify(saved);
+    const saving = state.wf.saving.dsSettings;
+    return drawerShell(
+      `${connector.provider} (${connector.connectorType})`,
+      `Status: ${connector.status} · id ${connector.id}`,
+      `
+      <h4 style="margin:0 0 8px">General / WFM / Time Zone / Scorecards Settings</h4>
+      ${SETTINGS_FIELDS.map((f) => `
+        <div class="field" style="margin-top:10px">
+          <label>${f.label}</label>
+          ${f.type === 'checkbox'
+            ? `<input type="checkbox" data-wf="ds-settings-field" data-id="${f.id}" ${d[f.id] ? 'checked' : ''} />`
+            : `<input type="${f.type === 'number' ? 'number' : 'text'}" data-wf="ds-settings-field" data-id="${f.id}" placeholder="${esc(f.placeholder || '')}" value="${esc(d[f.id])}" />`}
+        </div>`).join('')}
+      <h4 style="margin:20px 0 8px">Recorder Settings</h4>
+      <p>${gap('No recorder/telephony-hardware config concept exists in this SaaS architecture — nothing downstream reads these fields, so they are not shown.')}</p>
+      <h4 style="margin:20px 0 8px">Recorder TDM Settings</h4>
+      <p>${gap('Same as Recorder Settings above.')}</p>
+      <h4 style="margin:20px 0 8px">Device IP Configuration</h4>
+      <p>${gap('No device-IP/hardware-address concept exists for this platform\'s connectors.')}</p>
+      <h4 style="margin:20px 0 8px">SIP Call Tracking</h4>
+      <p>${gap('No SIP signaling-layer concept exists — real-time capture is via the ACD provider\'s own API/relay, not raw SIP.')}</p>
+      <h4 style="margin:20px 0 8px">Integration Service Associations</h4>
+      <p>${gap('No Enterprise/Site/Group/Recorder hierarchy exists in this platform\'s data model.')}</p>
+      ${testResultBadge(state.dsTestResult)}
+      `,
+      `<button class="btn" data-wf="close-drawer">Close</button><button class="btn" data-wf="ds-settings-revert" ${dirty ? '' : 'disabled'}>Revert</button>`,
+      `<button class="btn btn-primary" data-wf="ds-settings-save" ${dirty && !saving ? '' : 'disabled'}>${saving ? 'Saving…' : 'Save'}</button>`,
+    );
+  }
+  return '';
+}
+
+export function handle(state, act, id, value) {
+  if (act === 'ds-search') { state.dsSearch = value; return true; }
+  if (act === 'ds-type-filter') { state.dsTypeFilter = value; return true; }
+  if (act === 'ds-status-filter') { state.dsStatusFilter = value; return true; }
+  if (act === 'ds-refresh') { state.wf.connectors = null; return true; }
+
+  if (act === 'ds-connector-open') {
+    state.dsConnectorDraft = emptyConnectorDraft();
+    state.drawer = 'ds-connector';
+    return true;
+  }
+  if (act === 'ds-connector-field') { state.dsConnectorDraft[id] = value; return true; }
+  if (act === 'ds-connector-go') {
+    const d = state.dsConnectorDraft;
+    if (!d.provider.trim()) { toast('Provider is required.'); return true; }
+    let credentials;
+    if (d.authMode === 'credentials') {
+      try { credentials = JSON.parse(d.credentialsJson); } catch { toast('Credentials must be valid JSON.'); return true; }
+    }
+    state.wf.saving.dsConnector = true;
+    doRerender();
+    Api.integrationHubGql(CREATE_MUTATION, {
+      connectorType: d.connectorType,
+      provider: d.provider.trim(),
+      credentials: d.authMode === 'credentials' ? credentials : undefined,
+      oauthClientId: d.authMode === 'oauth' ? d.oauthClientId.trim() || undefined : undefined,
+      oauthClientSecret: d.authMode === 'oauth' ? d.oauthClientSecret.trim() || undefined : undefined,
+      oauthAuthorizationEndpoint: d.authMode === 'oauth' ? d.oauthAuthorizationEndpoint.trim() || undefined : undefined,
+      oauthTokenEndpoint: d.authMode === 'oauth' ? d.oauthTokenEndpoint.trim() || undefined : undefined,
+      oauthRedirectUri: d.authMode === 'oauth' ? d.oauthRedirectUri.trim() || undefined : undefined,
+      oauthScope: d.authMode === 'oauth' ? d.oauthScope.trim() || undefined : undefined,
+    })
+      .then((data) => {
+        state.wf.saving.dsConnector = false;
+        state.drawer = null;
+        state.wf.connectors = null;
+        toast(data.createConnector.authorizationUrl ? 'Data source created — complete OAuth consent to activate it.' : 'Data source created.');
+        doRerender();
+      })
+      .catch((err) => {
+        state.wf.saving.dsConnector = false;
+        toast(errMsg(err));
+        doRerender();
+      });
+    return true;
+  }
+
+  if (act === 'ds-view') {
+    state.dsDetailId = id;
+    state.dsSettingsDraft = null;
+    state.dsTestResult = null;
+    state.drawer = 'ds-detail';
+    return true;
+  }
+  if (act === 'ds-settings-field') {
+    const field = SETTINGS_FIELDS.find((f) => f.id === id);
+    state.dsSettingsDraft[id] = field && field.type === 'checkbox' ? value === true || value === 'true' : value;
+    return true;
+  }
+  if (act === 'ds-settings-revert') {
+    const list = state.wf.connectors;
+    const connector = list.rows.find((c) => c.id === state.dsDetailId);
+    state.dsSettingsDraft = settingsDraftFrom(connector);
+    return true;
+  }
+  if (act === 'ds-settings-save') {
+    const d = state.dsSettingsDraft;
+    const settings = {};
+    SETTINGS_FIELDS.forEach((f) => {
+      if (f.type === 'checkbox') { settings[f.id] = !!d[f.id]; return; }
+      if (f.type === 'number') { settings[f.id] = d[f.id] === '' ? null : Number(d[f.id]); return; }
+      settings[f.id] = d[f.id] === '' ? null : d[f.id];
+    });
+    Object.keys(settings).forEach((k) => { if (settings[k] === null) delete settings[k]; });
+    state.wf.saving.dsSettings = true;
+    doRerender();
+    Api.integrationHubGql(UPDATE_SETTINGS_MUTATION, { connectorId: state.dsDetailId, settings })
+      .then(() => {
+        state.wf.saving.dsSettings = false;
+        state.wf.connectors = null;
+        toast('Settings saved.');
+        doRerender();
+      })
+      .catch((err) => {
+        state.wf.saving.dsSettings = false;
+        toast(errMsg(err));
+        doRerender();
+      });
+    return true;
+  }
+
+  if (act === 'ds-test') {
+    toast('Testing connection…');
+    Api.integrationHubGql(TEST_MUTATION, { connectorId: id })
+      .then((data) => {
+        state.dsTestResult = data.testConnector;
+        toast(data.testConnector.ok ? 'Connection OK.' : `Connection check failed: ${data.testConnector.detail}`);
+        doRerender();
+      })
+      .catch((err) => toast(errMsg(err)));
+    return true;
+  }
+
+  if (act === 'ds-sync') {
+    toast('Sync triggered…');
+    Api.integrationHubApi(`/v1/integrations/connectors/${id}/sync`, { method: 'POST' })
+      .then(() => { toast('Sync started — see Import Status for progress.'); state.wf.connectors = null; doRerender(); })
+      .catch((err) => toast(errMsg(err)));
+    return true;
+  }
+
+  if (act === 'ds-delete') {
+    if (!confirm('Delete this data source? It will be disabled and hidden from active lists; sync/mapping history is retained.')) return true;
+    Api.integrationHubGql(DELETE_MUTATION, { connectorId: id })
+      .then(() => { toast('Data source deleted.'); state.wf.connectors = null; doRerender(); })
+      .catch((err) => toast(errMsg(err)));
+    return true;
+  }
+
+  return false;
+}

@@ -24,7 +24,6 @@ import * as SystemConfigWfmDefaults from './system-config/wfm-defaults.js';
 import * as SystemConfigSecurity from './system-config/security.js';
 import * as SystemConfigEmail from './system-config/email.js';
 import * as SystemConfigSso from './system-config/sso.js';
-import * as SystemConfigDataSources from './system-config/data-sources.js';
 import * as SystemConfigFeatureFlags from './system-config/feature-flags.js';
 import * as SystemConfigRetention from './system-config/retention.js';
 import * as SystemConfigNotifications from './system-config/notifications.js';
@@ -49,7 +48,6 @@ const TABS = {
   'sc-security': SystemConfigSecurity,
   'sc-email': SystemConfigEmail,
   'sc-sso': SystemConfigSso,
-  'sc-datasources': SystemConfigDataSources,
   'sc-features': SystemConfigFeatureFlags,
   'sc-retention': SystemConfigRetention,
   'sc-notifications': SystemConfigNotifications,
@@ -61,7 +59,7 @@ const TABS = {
    drawer(state) dispatcher, just distributed across modules. */
 const DRAWER_MODULES = [
   Employees, Usernames, Interactions, Groups, Skills, WorkRules, StaffingProfile, TimeOff,
-  SystemConfigSso, SystemConfigDataSources, SystemConfigRetention,
+  SystemConfigSso, SystemConfigRetention,
 ];
 
 /* render(state) returns null for "roles" (and any tab this module doesn't

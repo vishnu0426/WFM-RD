@@ -24,6 +24,7 @@ import {
 import { NAV, GROUP_OF, LEAF_SCREEN, metaFor } from '../modules/identity-org/nav.js';
 import { loadOrgUnits as loadOrgUnitsShared } from '../modules/identity-org/shared/loaders.js';
 import * as ForecastingScheduling from '../modules/forecasting-scheduling/index.js';
+import * as IntegrationHub from '../modules/integration-hub/index.js';
 import { currentUserIsPlatformAdmin } from './current-user.js';
 
 /* Two consoles share this one shell/router: the identity-org module (Modules
@@ -43,6 +44,13 @@ const MODULES = {
     groupOf: ForecastingScheduling.GROUP_OF,
     leafScreen: ForecastingScheduling.LEAF_SCREEN,
     mod: ForecastingScheduling,
+  },
+  "integration-hub": {
+    label: "Integration Management",
+    nav: IntegrationHub.NAV,
+    groupOf: IntegrationHub.GROUP_OF,
+    leafScreen: IntegrationHub.LEAF_SCREEN,
+    mod: IntegrationHub,
   },
 };
 const activeModule = () => MODULES[state.module] || MODULES["user-management"];
@@ -166,6 +174,9 @@ setRerender(() => render());
   function inner() {
     if (state.module === "forecasting-scheduling") {
       return ForecastingScheduling.render(state) || `<div class="panel"><div class="empty"><h2>Select a section</h2></div></div>`;
+    }
+    if (state.module === "integration-hub") {
+      return IntegrationHub.render(state) || `<div class="panel"><div class="empty"><h2>Select a section</h2></div></div>`;
     }
     if (
       IdentityOrg &&
