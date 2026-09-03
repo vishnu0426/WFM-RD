@@ -12,6 +12,9 @@ import {
   FieldAuthoritySource,
   FieldConflictAction,
 } from '../../integrations/entities/field-authority-policy.entity';
+import { ReasonCode } from '../../integrations/entities/reason-code.entity';
+import { DataSourceGroup } from '../../integrations/entities/data-source-group.entity';
+import { DataSourceGroupQueue } from '../../integrations/entities/data-source-group-queue.entity';
 import { CreateConnectorResult } from '../integration-connectors.service';
 
 registerEnumType(ConnectorType, { name: 'ConnectorType' });
@@ -180,6 +183,102 @@ export class FieldAuthorityPolicyResult {
 
   @Field(() => FieldConflictAction)
   conflictAction!: FieldConflictAction;
+}
+
+@ObjectType('ReasonCode')
+export class ReasonCodeResult {
+  @Field(() => ID)
+  id!: string;
+
+  @Field(() => ID)
+  connectorId!: string;
+
+  @Field()
+  externalId!: string;
+
+  @Field()
+  reasonCode!: string;
+
+  @Field(() => String, { nullable: true })
+  eventMode!: string | null;
+
+  @Field(() => String, { nullable: true })
+  eventReason!: string | null;
+
+  @Field()
+  shiftOperation!: string;
+
+  @Field(() => String, { nullable: true })
+  origin!: string | null;
+
+  @Field(() => Date)
+  updatedAt!: Date;
+}
+
+@ObjectType('DataSourceGroup')
+export class DataSourceGroupResult {
+  @Field(() => ID)
+  id!: string;
+
+  @Field(() => ID)
+  dataSourceId!: string;
+
+  @Field()
+  name!: string;
+
+  @Field(() => String, { nullable: true })
+  description!: string | null;
+
+  @Field(() => String, { nullable: true })
+  type!: string | null;
+
+  @Field(() => Number, { nullable: true })
+  avgWorkTimeSeconds!: number | null;
+
+  @Field(() => Date)
+  updatedAt!: Date;
+}
+
+@ObjectType('DataSourceGroupQueue')
+export class DataSourceGroupQueueResult {
+  @Field(() => ID)
+  id!: string;
+
+  @Field(() => ID)
+  groupId!: string;
+
+  @Field(() => ID)
+  ccQueueId!: string;
+}
+
+export function toReasonCodeResult(row: ReasonCode): ReasonCodeResult {
+  return {
+    id: row.id,
+    connectorId: row.connectorId,
+    externalId: row.externalId,
+    reasonCode: row.reasonCode,
+    eventMode: row.eventMode,
+    eventReason: row.eventReason,
+    shiftOperation: row.shiftOperation,
+    origin: row.origin,
+    updatedAt: row.updatedAt,
+  };
+}
+
+export function toDataSourceGroupResult(row: DataSourceGroup): DataSourceGroupResult {
+  return {
+    id: row.id,
+    dataSourceId: row.dataSourceId,
+    name: row.name,
+    description: row.description,
+    type: row.type,
+    avgWorkTimeSeconds: row.avgWorkTimeSeconds,
+    updatedAt: row.updatedAt,
+  };
+}
+
+export function toDataSourceGroupQueueResult(row: DataSourceGroupQueue): DataSourceGroupQueueResult {
+  return { id: row.id, groupId: row.groupId, ccQueueId: row.ccQueueId };
 }
 
 export function toIntegrationConnectorResult(connector: IntegrationConnector): IntegrationConnectorResult {

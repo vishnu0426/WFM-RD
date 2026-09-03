@@ -13,6 +13,9 @@ import { OAuthCallbackController } from './oauth-callback.controller';
 import { TenantConnectorsController } from './rest/tenant-connectors.controller';
 import { FieldMappingsService } from './field-mappings.service';
 import { FieldAuthorityPoliciesService } from './field-authority-policies.service';
+import { ReasonCodesService } from './reason-codes.service';
+import { DataSourceGroupsService } from './data-source-groups.service';
+import { ForecastingHttpClientModule } from '../forecasting/forecasting-http-client.module';
 
 @Module({
   // AuthModule imported for TenantConnectorsController's guard trio, and
@@ -23,17 +26,25 @@ import { FieldAuthorityPoliciesService } from './field-authority-policies.servic
   // root service's AnalyticsModule/TenantMonitoringModule already needed;
   // importing AuthModule alone isn't enough, confirmed live here too - the
   // app failed to boot without this).
-  imports: [VaultModule, TenantContextModule, MetricsModule, AuthModule, AuditGrpcClientModule],
+  imports: [VaultModule, TenantContextModule, MetricsModule, AuthModule, AuditGrpcClientModule, ForecastingHttpClientModule],
   controllers: [OAuthCallbackController, TenantConnectorsController],
   providers: [
     IntegrationConnectorsService,
     OAuthTokenExchangeService,
     FieldMappingsService,
     FieldAuthorityPoliciesService,
+    ReasonCodesService,
+    DataSourceGroupsService,
     AccessTokenGuard,
     PermissionsGuard,
     PlatformAdminGuard,
   ],
-  exports: [IntegrationConnectorsService, FieldMappingsService, FieldAuthorityPoliciesService],
+  exports: [
+    IntegrationConnectorsService,
+    FieldMappingsService,
+    FieldAuthorityPoliciesService,
+    ReasonCodesService,
+    DataSourceGroupsService,
+  ],
 })
 export class IntegrationConnectorsModule {}

@@ -19,6 +19,8 @@ import { FieldMappingResolver } from '../connectors/graphql/field-mapping.resolv
 import { SyncJobHistoryResolver } from '../connectors/graphql/sync-job-history.resolver';
 import { FieldAuthorityPolicyResolver } from '../connectors/graphql/field-authority-policy.resolver';
 import { ConnectorHealthResolver } from '../connectors/graphql/connector-health.resolver';
+import { ReasonCodeResolver } from '../connectors/graphql/reason-code.resolver';
+import { DataSourceGroupResolver } from '../connectors/graphql/data-source-group.resolver';
 
 /** GraphQL-side counterpart to `DomainErrorFilter` (REST) - own copy of every other service's own `formatGraphQLError`. */
 function formatGraphQLError(formattedError: GraphQLFormattedError, error: unknown): GraphQLFormattedError {
@@ -93,6 +95,8 @@ function formatGraphQLError(formattedError: GraphQLFormattedError, error: unknow
     SyncJobHistoryResolver,
     FieldAuthorityPolicyResolver,
     ConnectorHealthResolver,
+    ReasonCodeResolver,
+    DataSourceGroupResolver,
     AccessTokenGuard,
     PermissionsGuard,
     TenantTokenMatchGuard,

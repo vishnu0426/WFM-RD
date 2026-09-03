@@ -63,4 +63,11 @@ export class FieldMappingsService {
       manager.getRepository(FieldMapping).find({ where: { tenantId, connectorId }, order: { sourceField: 'ASC' } }),
     );
   }
+
+  /** WP3: `ReasonCodesService`'s own lookup before merging into a `valueMap` - the same `(connector_id, source_field)` unique key `upsert` keys off of. */
+  async findBySourceField(tenantId: string, connectorId: string, sourceField: string): Promise<FieldMapping | null> {
+    return withTenantConnection(this.dataSource, tenantId, (manager) =>
+      manager.getRepository(FieldMapping).findOne({ where: { tenantId, connectorId, sourceField } }),
+    );
+  }
 }

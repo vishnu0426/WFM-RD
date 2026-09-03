@@ -27,7 +27,9 @@ export type ConnectorSettingKey =
   | 'externalName'
   | 'contactViewerServerName'
   | 'contactViewerServerPort'
-  | 'contactViewerUrlOverride';
+  | 'contactViewerUrlOverride'
+  /** WP3: which raw event field this connector's Reason Codes translate (e.g. Genesys "presenceState") - defaults to "reasonCode" when unset. See `ReasonCodesService`. */
+  | 'reasonCodeSourceField';
 
 type SettingValidator = (value: unknown, key: string) => void;
 
@@ -81,7 +83,10 @@ const CONNECTOR_SETTINGS_SCHEMA: Record<ConnectorSettingKey, SettingValidator> =
   contactViewerServerName: stringSetting(255),
   contactViewerServerPort: portSetting,
   contactViewerUrlOverride: stringSetting(2048),
+  reasonCodeSourceField: stringSetting(200),
 };
+
+export const DEFAULT_REASON_CODE_SOURCE_FIELD = 'reasonCode';
 
 /**
  * Rejects unknown keys outright (fail loud, per the module's "never fake a

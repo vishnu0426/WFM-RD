@@ -5,12 +5,16 @@ import { WebhookSubscription } from '../integrations/entities/webhook-subscripti
 import { WebhookDelivery } from '../integrations/entities/webhook-delivery.entity';
 import { ProviderRateLimitConfig } from '../integrations/entities/provider-rate-limit-config.entity';
 import { FieldAuthorityPolicy } from '../integrations/entities/field-authority-policy.entity';
+import { ReasonCode } from '../integrations/entities/reason-code.entity';
+import { DataSourceGroup } from '../integrations/entities/data-source-group.entity';
+import { DataSourceGroupQueue } from '../integrations/entities/data-source-group-queue.entity';
 
 /**
  * Single source of truth for "every entity in this service," consumed by
  * both the NestJS `TypeOrmModule` registration and the CLI `DataSource`
  * used for migrations - same convention as every other service's own
- * `src/database/entities.ts`.
+ * `src/database/entities.ts`. `ReasonCode`/`DataSourceGroup`/
+ * `DataSourceGroupQueue` added by Tenant Admin Integration Management WP3.
  */
 export const entities = [
   IntegrationConnector,
@@ -20,6 +24,9 @@ export const entities = [
   WebhookDelivery,
   ProviderRateLimitConfig,
   FieldAuthorityPolicy,
+  ReasonCode,
+  DataSourceGroup,
+  DataSourceGroupQueue,
 ];
 
 export {
@@ -30,4 +37,7 @@ export {
   WebhookDelivery,
   ProviderRateLimitConfig,
   FieldAuthorityPolicy,
+  ReasonCode,
+  DataSourceGroup,
+  DataSourceGroupQueue,
 };
