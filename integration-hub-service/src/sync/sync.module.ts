@@ -13,6 +13,11 @@ import { HistoricalBackfillRunnerService } from './historical/historical-backfil
 import { HistoricalImportController } from './historical/historical-import.controller';
 import { HISTORICAL_CONNECTOR_ADAPTERS } from './historical/historical-connector-adapter';
 import { DatabaseHistoricalAdapter } from './historical/providers/database.adapter';
+import { GenesysCloudHistoricalAdapter } from './historical/providers/genesys-cloud-historical.adapter';
+import { AvayaAxpHistoricalAdapter } from './historical/providers/avaya-axp-historical.adapter';
+import { TalkdeskHistoricalAdapter } from './historical/providers/talkdesk-historical.adapter';
+import { NiceCxoneHistoricalAdapter } from './historical/providers/nice-cxone-historical.adapter';
+import { Five9HistoricalAdapter } from './historical/providers/five9-historical.adapter';
 import { SyncJobsService } from './sync-jobs.service';
 import { ProviderRateLimitConfigService } from './provider-rate-limit-config.service';
 import { BATCH_CONNECTOR_ADAPTERS } from './batch/batch-connector-adapter';
@@ -65,10 +70,29 @@ import { AvayaAuraAdapter } from './relay/providers/avaya-aura.adapter';
     HistoricalAdapterRegistry,
     HistoricalBackfillRunnerService,
     DatabaseHistoricalAdapter,
+    GenesysCloudHistoricalAdapter,
+    AvayaAxpHistoricalAdapter,
+    TalkdeskHistoricalAdapter,
+    NiceCxoneHistoricalAdapter,
+    Five9HistoricalAdapter,
     {
       provide: HISTORICAL_CONNECTOR_ADAPTERS,
-      useFactory: (database: DatabaseHistoricalAdapter) => [database],
-      inject: [DatabaseHistoricalAdapter],
+      useFactory: (
+        database: DatabaseHistoricalAdapter,
+        genesys: GenesysCloudHistoricalAdapter,
+        avayaAxp: AvayaAxpHistoricalAdapter,
+        talkdesk: TalkdeskHistoricalAdapter,
+        nice: NiceCxoneHistoricalAdapter,
+        five9: Five9HistoricalAdapter,
+      ) => [database, genesys, avayaAxp, talkdesk, nice, five9],
+      inject: [
+        DatabaseHistoricalAdapter,
+        GenesysCloudHistoricalAdapter,
+        AvayaAxpHistoricalAdapter,
+        TalkdeskHistoricalAdapter,
+        NiceCxoneHistoricalAdapter,
+        Five9HistoricalAdapter,
+      ],
     },
     ProviderRateLimitConfigService,
     RateLimiterService,

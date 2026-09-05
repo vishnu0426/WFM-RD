@@ -33,7 +33,11 @@ export type ConnectorSettingKey =
   /** WP5's Database historical-adapter follow-up: `{ [datasetKey]: sqlTemplate }` - a `database`-provider connector's own tenant-authored, per-dataset query. Never interpolated with the date range directly - `DatabaseHistoricalAdapter` always binds `rangeStart`/`rangeEnd` as `$1`/`$2` query parameters, never string concatenation. See that adapter's own doc comment. */
   | 'historicalQueries'
   /** WP5's Database historical-adapter follow-up: whether `DatabaseHistoricalAdapter` requires TLS for this connector's external database connection. Defaults to true (fail secure) when unset. */
-  | 'historicalDatabaseSsl';
+  | 'historicalDatabaseSsl'
+  /** `GenesysCloudHistoricalAdapter`'s own real, required query parameters: `{ queueIds: string[], metrics: string[], granularity?: string }` - see that adapter's own doc comment for the real Genesys Cloud Analytics API fields these map onto. */
+  | 'genesysCloud'
+  /** `Five9HistoricalAdapter`'s own real, required parameter: `{ folderName: string }` - the Five9 Reports Designer folder holding the report named by the historical import's own dataset key. */
+  | 'five9';
 
 type SettingValidator = (value: unknown, key: string) => void;
 
@@ -94,6 +98,31 @@ function historicalQueriesSetting(value: unknown, key: string): void {
   }
 }
 
+function genesysCloudSetting(value: unknown, key: string): void {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new InvalidConnectorSettingsError(`"${key}" must be an object.`);
+  }
+  const v = value as Record<string, unknown>;
+  if (!Array.isArray(v.queueIds) || v.queueIds.some((id) => typeof id !== 'string')) {
+    throw new InvalidConnectorSettingsError(`"${key}.queueIds" must be an array of strings.`);
+  }
+  if (!Array.isArray(v.metrics) || v.metrics.some((m) => typeof m !== 'string')) {
+    throw new InvalidConnectorSettingsError(`"${key}.metrics" must be an array of strings.`);
+  }
+  if (v.granularity !== undefined && typeof v.granularity !== 'string') {
+    throw new InvalidConnectorSettingsError(`"${key}.granularity" must be a string (ISO 8601 duration, e.g. "PT30M").`);
+  }
+}
+
+function five9Setting(value: unknown, key: string): void {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new InvalidConnectorSettingsError(`"${key}" must be an object.`);
+  }
+  if (!isNonEmptyString((value as Record<string, unknown>).folderName)) {
+    throw new InvalidConnectorSettingsError(`"${key}.folderName" must be a non-empty string.`);
+  }
+}
+
 const CONNECTOR_SETTINGS_SCHEMA: Record<ConnectorSettingKey, SettingValidator> = {
   name: stringSetting(200),
   description: stringSetting(2000),
@@ -106,6 +135,8 @@ const CONNECTOR_SETTINGS_SCHEMA: Record<ConnectorSettingKey, SettingValidator> =
   reasonCodeSourceField: stringSetting(200),
   historicalQueries: historicalQueriesSetting,
   historicalDatabaseSsl: booleanSetting,
+  genesysCloud: genesysCloudSetting,
+  five9: five9Setting,
 };
 
 export const DEFAULT_REASON_CODE_SOURCE_FIELD = 'reasonCode';
