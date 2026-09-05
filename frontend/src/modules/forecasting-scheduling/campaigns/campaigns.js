@@ -144,7 +144,7 @@ export function renderDrawer(state) {
   // silently to its original value. Confirmed with an actual dropped edit
   // before this fix, not a hypothetical.
   const d = state.campaignDraft || draftFor(editing);
-  return drawerShell(editing ? "Edit campaign" : "Create campaign", editing ? "PATCH /v1/forecasting/campaigns/:id" : "POST /v1/forecasting/campaigns",
+  return drawerShell(editing ? "Edit campaign" : "Create campaign", editing ? "Update this campaign's details." : "Set up a new campaign — queues can be assigned afterward under Queues.",
     `<div class="field"><label>Name</label><input data-wf="campaign-field" data-id="name" placeholder="e.g. Q1 Support Surge" value="${esc(d.name)}" /></div>
      <div class="field" style="margin-top:10px"><label>Description</label><input data-wf="campaign-field" data-id="description" value="${esc(d.description)}" /></div>
      <div class="grid-2" style="margin-top:10px">

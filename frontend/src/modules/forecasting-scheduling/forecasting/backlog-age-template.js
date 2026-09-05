@@ -56,7 +56,7 @@ export function renderDrawer(state) {
   // campaigns.js's own note for the reproduced silently-reverted-edit bug
   // this avoids (a re-render landing between an edit and clicking Save).
   const d = state.batDraft || draftFor(editing);
-  return drawerShell(editing ? "Edit backlog age template" : "Create backlog age template", editing ? "PATCH /v1/forecasting/backlog-age-templates/:id" : "POST /v1/forecasting/backlog-age-templates",
+  return drawerShell(editing ? "Edit backlog age template" : "Create backlog age template", editing ? "Update this template's thresholds." : "Define warning/critical age thresholds to reuse across backlog snapshots.",
     `<div class="field"><label>Name</label><input data-wf="bat-field" data-id="name" value="${esc(d.name)}" /></div>
      <div class="field" style="margin-top:10px"><label>Description</label><input data-wf="bat-field" data-id="description" value="${esc(d.description)}" /></div>
      <div class="grid-2" style="margin-top:10px">

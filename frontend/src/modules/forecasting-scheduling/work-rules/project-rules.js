@@ -62,7 +62,7 @@ export function renderDrawer(state) {
   // silently revert an unsaved change. See campaigns.js's own note for the
   // reproduced bug this pattern fixes.
   const d = state.prDraft || draftFor(editing);
-  return drawerShell(editing ? "Edit project rule" : "Create project rule", editing ? "PATCH /v1/scheduling/project-rules/:id" : "POST /v1/scheduling/project-rules",
+  return drawerShell(editing ? "Edit project rule" : "Create project rule", editing ? "Update this project rule's limits." : "Define a new scheduling project rule.",
     `<div class="field"><label>Name</label><input data-wf="pr-field" data-id="name" value="${esc(d.name)}" /></div>
      <div class="field" style="margin-top:10px"><label>Description</label><input data-wf="pr-field" data-id="description" value="${esc(d.description)}" /></div>
      <div class="grid-2" style="margin-top:10px">

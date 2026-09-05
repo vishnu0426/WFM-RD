@@ -70,7 +70,7 @@ export function renderDrawer(state) {
   if (state.drawer !== "ser") return "";
   const eventType = EVENT_TYPE_BY_TAB[state.tab];
   const employees = isOk(state.wf.employees) ? state.wf.employees : [];
-  return drawerShell(`New ${TITLE_BY_TAB[state.tab] === "OT Extensions" ? "OT extension" : TITLE_BY_TAB[state.tab].replace(/s$/, "")} request`, "POST /v1/scheduling/shift-event-requests",
+  return drawerShell(`New ${TITLE_BY_TAB[state.tab] === "OT Extensions" ? "OT extension" : TITLE_BY_TAB[state.tab].replace(/s$/, "")} request`, "Submit a new request for approval.",
     `<div class="field"><label>Employee</label><select id="ser-emp">${employees.map((e) => `<option value="${e.id}">${esc(empLabel(state, e))}</option>`).join("") || `<option value="">No employees loaded</option>`}</select></div>
      <div class="grid-2" style="margin-top:10px">
        <div class="field"><label>Shift date</label><input id="ser-date" type="date" /></div>

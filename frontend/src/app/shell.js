@@ -283,9 +283,35 @@ setRerender(() => render());
   const isUnwantedScrimMatch = (matchEl, targetEl) =>
     matchEl && targetEl !== matchEl && (matchEl.classList.contains("drawer-scrim") || matchEl.classList.contains("modal-scrim"));
 
+  /* A real, reproduced bug (found live, not hypothetical): every data-wf
+     element used to be dispatched on "click", including plain text/number/
+     date/time/file inputs, <select>, and <textarea> - clicking one to focus
+     it (or open its native file/date picker) ran preventDefault() +
+     mod.handle() + a SYNCHRONOUS render() that replaces app.innerHTML,
+     destroying the just-clicked element and its focus before the user typed
+     a single character. Confirmed live: after a real click into a text
+     field, document.activeElement was neither the original node (removed)
+     nor its replacement - nothing was focused, so typing went nowhere.
+     Checkbox/radio are the only input types whose real interaction *is* the
+     click itself (this app's own toggle-style actions rely on that) -
+     everything else here commits its value via the "change" listener below
+     (already correctly deferred with setTimeout) and must be left alone on
+     click so the browser's own focus/cursor-placement/native-picker
+     behavior can proceed undisturbed. */
+  function isClickCommittedField(el) {
+    const tag = el.tagName;
+    if (tag === "SELECT" || tag === "TEXTAREA") return false;
+    if (tag === "INPUT") {
+      const type = (el.type || "text").toLowerCase();
+      return type === "checkbox" || type === "radio";
+    }
+    return true;
+  }
+
   app.addEventListener("click", (e) => {
     let wfEl = e.target.closest("[data-wf]");
     if (isUnwantedScrimMatch(wfEl, e.target)) wfEl = null;
+    if (wfEl && !isClickCommittedField(wfEl)) wfEl = null;
     if (wfEl) {
       e.preventDefault();
       const act = wfEl.dataset.wf;

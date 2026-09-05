@@ -76,7 +76,7 @@ export function render(state) {
 export function renderDrawer(state) {
   if (state.drawer !== "bs") return "";
   const templates = isOk(state.wf.backlogAgeTemplates) ? state.wf.backlogAgeTemplates : [];
-  return drawerShell("Record backlog snapshot", "POST /v1/forecasting/backlog-snapshots",
+  return drawerShell("Record backlog snapshot", "Log a point-in-time backlog measurement.",
     `<div class="grid-2">
        <div class="field"><label>Item count</label><input id="bs-count" type="number" min="0" /></div>
        <div class="field"><label>Oldest item age (minutes)</label><input id="bs-age" type="number" min="0" /></div>
