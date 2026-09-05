@@ -10,7 +10,7 @@ import { doRerender } from '../../../app/rerender.js';
 import { toast } from '../../../app/toast.js';
 import { pageHead, sec, empty, stBadge, drawerShell, fmtDt, gap } from '../../identity-org/shared/ui.js';
 
-const CONNECTOR_TYPES = ['HRIS', 'PAYROLL', 'ACD', 'CRM', 'CUSTOM_WEBHOOK'];
+const CONNECTOR_TYPES = ['HRIS', 'PAYROLL', 'ACD', 'CRM', 'CUSTOM_WEBHOOK', 'DATABASE'];
 const BATCH_TYPES = new Set(['HRIS', 'PAYROLL', 'CRM']);
 const ACD_TYPES = new Set(['ACD']);
 
@@ -42,6 +42,8 @@ const SETTINGS_FIELDS = [
   { id: 'contactViewerServerName', label: 'Contact Viewer Server Name', type: 'text' },
   { id: 'contactViewerServerPort', label: 'Contact Viewer Server Port', type: 'number' },
   { id: 'contactViewerUrlOverride', label: 'Contact Viewer URL Override', type: 'text' },
+  { id: 'historicalDatabaseSsl', label: 'Require TLS for Historical Database Connection', type: 'checkbox' },
+  { id: 'historicalQueries', label: 'Historical Queries (JSON: { datasetKey: sqlTemplate })', type: 'json', placeholder: '{\n  "my_dataset": "SELECT * FROM my_table WHERE ts >= $1 AND ts <= $2"\n}' },
 ];
 
 function loadConnectors(state) {
@@ -76,7 +78,9 @@ function settingsDraftFrom(connector) {
   const s = connector.settings || {};
   const d = {};
   SETTINGS_FIELDS.forEach((f) => {
-    d[f.id] = f.type === 'checkbox' ? !!s[f.id] : (s[f.id] ?? '');
+    if (f.type === 'checkbox') { d[f.id] = !!s[f.id]; return; }
+    if (f.type === 'json') { d[f.id] = s[f.id] ? JSON.stringify(s[f.id], null, 2) : ''; return; }
+    d[f.id] = s[f.id] ?? '';
   });
   return d;
 }
@@ -192,7 +196,9 @@ export function renderDrawer(state) {
           <label>${f.label}</label>
           ${f.type === 'checkbox'
             ? `<input type="checkbox" data-wf="ds-settings-field" data-id="${f.id}" ${d[f.id] ? 'checked' : ''} />`
-            : `<input type="${f.type === 'number' ? 'number' : 'text'}" data-wf="ds-settings-field" data-id="${f.id}" placeholder="${esc(f.placeholder || '')}" value="${esc(d[f.id])}" />`}
+            : f.type === 'json'
+              ? `<textarea data-wf="ds-settings-field" data-id="${f.id}" rows="4" class="mono" placeholder="${esc(f.placeholder || '')}">${esc(d[f.id])}</textarea>`
+              : `<input type="${f.type === 'number' ? 'number' : 'text'}" data-wf="ds-settings-field" data-id="${f.id}" placeholder="${esc(f.placeholder || '')}" value="${esc(d[f.id])}" />`}
         </div>`).join('')}
       <h4 style="margin:20px 0 8px">Recorder Settings</h4>
       <p>${gap('No recorder/telephony-hardware config concept exists in this SaaS architecture — nothing downstream reads these fields, so they are not shown.')}</p>
@@ -281,11 +287,18 @@ export function handle(state, act, id, value) {
   if (act === 'ds-settings-save') {
     const d = state.dsSettingsDraft;
     const settings = {};
+    let jsonFieldError = null;
     SETTINGS_FIELDS.forEach((f) => {
       if (f.type === 'checkbox') { settings[f.id] = !!d[f.id]; return; }
       if (f.type === 'number') { settings[f.id] = d[f.id] === '' ? null : Number(d[f.id]); return; }
+      if (f.type === 'json') {
+        if (d[f.id] === '') { settings[f.id] = null; return; }
+        try { settings[f.id] = JSON.parse(d[f.id]); } catch { jsonFieldError = f.label; }
+        return;
+      }
       settings[f.id] = d[f.id] === '' ? null : d[f.id];
     });
+    if (jsonFieldError) { toast(`"${jsonFieldError}" must be valid JSON.`); return true; }
     Object.keys(settings).forEach((k) => { if (settings[k] === null) delete settings[k]; });
     state.wf.saving.dsSettings = true;
     doRerender();

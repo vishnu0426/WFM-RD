@@ -6,6 +6,8 @@ export enum ConnectorType {
   ACD = 'acd',
   CRM = 'crm',
   CUSTOM_WEBHOOK = 'custom_webhook',
+  /** Historical Data (WP5 follow-up): a tenant-owned external SQL database, pulled from directly rather than through a vendor API - see `DatabaseHistoricalAdapter`. Not batch/streaming (isBatchConnectorType/isStreamingConnectorType both correctly return false for it); reached only through the historical-import path. */
+  DATABASE = 'database',
 }
 
 export enum ConnectorStatus {

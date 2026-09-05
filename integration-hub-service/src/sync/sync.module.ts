@@ -11,6 +11,8 @@ import { migratorPoolProvider } from '../database/migrator-pool.provider';
 import { HistoricalAdapterRegistry } from './historical/historical-adapter-registry.service';
 import { HistoricalBackfillRunnerService } from './historical/historical-backfill-runner.service';
 import { HistoricalImportController } from './historical/historical-import.controller';
+import { HISTORICAL_CONNECTOR_ADAPTERS } from './historical/historical-connector-adapter';
+import { DatabaseHistoricalAdapter } from './historical/providers/database.adapter';
 import { SyncJobsService } from './sync-jobs.service';
 import { ProviderRateLimitConfigService } from './provider-rate-limit-config.service';
 import { BATCH_CONNECTOR_ADAPTERS } from './batch/batch-connector-adapter';
@@ -62,6 +64,12 @@ import { AvayaAuraAdapter } from './relay/providers/avaya-aura.adapter';
     SyncJobsService,
     HistoricalAdapterRegistry,
     HistoricalBackfillRunnerService,
+    DatabaseHistoricalAdapter,
+    {
+      provide: HISTORICAL_CONNECTOR_ADAPTERS,
+      useFactory: (database: DatabaseHistoricalAdapter) => [database],
+      inject: [DatabaseHistoricalAdapter],
+    },
     ProviderRateLimitConfigService,
     RateLimiterService,
     BulkImportClientService,

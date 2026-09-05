@@ -6,8 +6,10 @@ export interface HistoricalChunkOutcome {
   recordsProcessed: number;
   recordsFailed: number;
   recordsDuplicate: number;
-  /** Opaque to the runner - passed back unchanged on the next chunk/retry attempt so a provider that paginates within a single day can resume mid-chunk. */
+  /** Opaque to the runner - passed back unchanged on the next chunk/retry attempt so a provider that paginates within a single day can resume mid-chunk. Never used to carry fetched data - see `records` below for that. */
   checkpointCursor?: Record<string, unknown> | null;
+  /** The actual rows this chunk fetched, landed verbatim as `HistoricalRecord.rawData` by the runner - the real "Raw Data" layer (spec §38). Omitted (not just empty) by an adapter that lands data some other way itself. */
+  records?: Record<string, unknown>[];
   errorDetails?: Record<string, unknown> | null;
 }
 

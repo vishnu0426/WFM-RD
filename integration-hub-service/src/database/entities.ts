@@ -9,6 +9,7 @@ import { ReasonCode } from '../integrations/entities/reason-code.entity';
 import { DataSourceGroup } from '../integrations/entities/data-source-group.entity';
 import { DataSourceGroupQueue } from '../integrations/entities/data-source-group-queue.entity';
 import { HistoricalBackfillChunk } from '../integrations/entities/historical-backfill-chunk.entity';
+import { HistoricalRecord } from '../integrations/entities/historical-record.entity';
 
 /**
  * Single source of truth for "every entity in this service," consumed by
@@ -16,7 +17,8 @@ import { HistoricalBackfillChunk } from '../integrations/entities/historical-bac
  * used for migrations - same convention as every other service's own
  * `src/database/entities.ts`. `ReasonCode`/`DataSourceGroup`/
  * `DataSourceGroupQueue` added by Tenant Admin Integration Management WP3,
- * `HistoricalBackfillChunk` by WP5.
+ * `HistoricalBackfillChunk` by WP5, `HistoricalRecord` by WP5's Database
+ * historical-adapter follow-up.
  */
 export const entities = [
   IntegrationConnector,
@@ -30,6 +32,7 @@ export const entities = [
   DataSourceGroup,
   DataSourceGroupQueue,
   HistoricalBackfillChunk,
+  HistoricalRecord,
 ];
 
 export {
@@ -44,4 +47,5 @@ export {
   DataSourceGroup,
   DataSourceGroupQueue,
   HistoricalBackfillChunk,
+  HistoricalRecord,
 };

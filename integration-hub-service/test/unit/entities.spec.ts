@@ -21,18 +21,18 @@ import { entities } from '../../src/database/entities';
  * TypeScript compile alone would not.
  */
 describe('database entities', () => {
-  it('registers all seven §2.1 entities plus WP3\'s ReasonCode/DataSourceGroup/DataSourceGroupQueue and WP5\'s HistoricalBackfillChunk, scoped to the integration_hub schema', () => {
-    expect(entities).toHaveLength(11);
+  it('registers all seven §2.1 entities plus WP3\'s ReasonCode/DataSourceGroup/DataSourceGroupQueue, WP5\'s HistoricalBackfillChunk, and the Database historical-adapter follow-up\'s HistoricalRecord, scoped to the integration_hub schema', () => {
+    expect(entities).toHaveLength(12);
     const entitySet = new Set<unknown>(entities);
     const tables = getMetadataArgsStorage().tables.filter((t) => entitySet.has(t.target));
-    expect(tables).toHaveLength(11);
+    expect(tables).toHaveLength(12);
     for (const table of tables) {
       expect(table.schema).toBe('integration_hub');
     }
   });
 
-  it("ConnectorType matches §2.1's enum exactly", () => {
-    expect(Object.values(ConnectorType).sort()).toEqual(['acd', 'crm', 'custom_webhook', 'hris', 'payroll'].sort());
+  it("ConnectorType matches §2.1's enum plus the Database historical-adapter follow-up's 'database' addition", () => {
+    expect(Object.values(ConnectorType).sort()).toEqual(['acd', 'crm', 'custom_webhook', 'database', 'hris', 'payroll'].sort());
   });
 
   it("ConnectorStatus matches §2.1's enum plus WP1's soft-delete 'disabled' state", () => {

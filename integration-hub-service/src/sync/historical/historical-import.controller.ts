@@ -70,6 +70,15 @@ export class HistoricalImportController {
     return this.runner.chunksForJob(tenantId, jobId);
   }
 
+  /** Real landed rows (spec §38's Raw Data layer) - see `HistoricalRecord`'s own doc comment. */
+  @UseGuards(AccessTokenGuard, PermissionsGuard, TenantTokenMatchGuard)
+  @RequirePermissions('historical_import:read')
+  @Get('historical-imports/:jobId/records')
+  async records(@Param('jobId') jobId: string) {
+    const tenantId = this.tenantContext.requireTenantId();
+    return this.runner.recordsForJob(tenantId, jobId);
+  }
+
   @UseGuards(AccessTokenGuard, PermissionsGuard, TenantTokenMatchGuard)
   @RequirePermissions('historical_import:write')
   @Post('historical-imports/:jobId/resume')

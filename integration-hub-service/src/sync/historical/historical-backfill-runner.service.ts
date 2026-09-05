@@ -9,6 +9,7 @@ import { withTenantConnection } from '../../database/with-tenant-connection';
 import { IntegrationConnector, SyncJobStatus } from '../../integrations/entities/integration-connector.entity';
 import { SyncJob, SyncType } from '../../integrations/entities/sync-job.entity';
 import { HistoricalBackfillChunk, HistoricalBackfillChunkStatus } from '../../integrations/entities/historical-backfill-chunk.entity';
+import { HistoricalRecord } from '../../integrations/entities/historical-record.entity';
 import { HistoricalAdapterRegistry } from './historical-adapter-registry.service';
 import { ConnectorNotFoundError } from '../../connectors/errors/connector-not-found.error';
 import { HistoricalImportNotSupportedError } from './errors/historical-import-not-supported.error';
@@ -153,6 +154,18 @@ export class HistoricalBackfillRunnerService {
       manager.getRepository(HistoricalBackfillChunk).find({
         where: { tenantId, syncJobId: jobId },
         order: { chunkIndex: 'ASC' },
+      }),
+    );
+  }
+
+  /** The real landed rows (spec §38's "Raw Data" layer) - capped, not the full set, for a UI preview rather than a bulk export. */
+  async recordsForJob(tenantId: string, jobId: string, limit = 100): Promise<HistoricalRecord[]> {
+    await this.findJob(tenantId, jobId);
+    return withTenantConnection(this.dataSource, tenantId, (manager) =>
+      manager.getRepository(HistoricalRecord).find({
+        where: { tenantId, syncJobId: jobId },
+        order: { fetchedAt: 'DESC' },
+        take: Math.min(limit, 500),
       }),
     );
   }
@@ -350,6 +363,18 @@ export class HistoricalBackfillRunnerService {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await manager.update(SyncJob, { id: jobId, tenantId }, jobUpdate as any);
     });
+
+    // Real "Raw Data" landing (spec §38) - only for an adapter that
+    // actually returns rows (`DatabaseHistoricalAdapter`); an adapter
+    // that lands data some other way of its own simply omits `records`.
+    if (outcome.records && outcome.records.length > 0) {
+      await withTenantConnection(this.dataSource, tenantId, (manager) =>
+        manager.save(
+          HistoricalRecord,
+          outcome.records!.map((rawData) => ({ id: randomUUID(), tenantId, syncJobId: jobId, chunkId, rawData })),
+        ),
+      );
+    }
   }
 
   private async failJobUnsupported(tenantId: string, jobId: string, provider: string): Promise<void> {

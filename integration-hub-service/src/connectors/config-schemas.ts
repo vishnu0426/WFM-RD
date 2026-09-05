@@ -29,7 +29,11 @@ export type ConnectorSettingKey =
   | 'contactViewerServerPort'
   | 'contactViewerUrlOverride'
   /** WP3: which raw event field this connector's Reason Codes translate (e.g. Genesys "presenceState") - defaults to "reasonCode" when unset. See `ReasonCodesService`. */
-  | 'reasonCodeSourceField';
+  | 'reasonCodeSourceField'
+  /** WP5's Database historical-adapter follow-up: `{ [datasetKey]: sqlTemplate }` - a `database`-provider connector's own tenant-authored, per-dataset query. Never interpolated with the date range directly - `DatabaseHistoricalAdapter` always binds `rangeStart`/`rangeEnd` as `$1`/`$2` query parameters, never string concatenation. See that adapter's own doc comment. */
+  | 'historicalQueries'
+  /** WP5's Database historical-adapter follow-up: whether `DatabaseHistoricalAdapter` requires TLS for this connector's external database connection. Defaults to true (fail secure) when unset. */
+  | 'historicalDatabaseSsl';
 
 type SettingValidator = (value: unknown, key: string) => void;
 
@@ -74,6 +78,22 @@ function timeZoneSetting(value: unknown, key: string): void {
   }
 }
 
+const MAX_HISTORICAL_QUERY_TEMPLATE_LENGTH = 10000;
+
+function historicalQueriesSetting(value: unknown, key: string): void {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new InvalidConnectorSettingsError(`"${key}" must be an object of { datasetKey: sqlTemplate }.`);
+  }
+  for (const [datasetKey, template] of Object.entries(value as Record<string, unknown>)) {
+    if (typeof template !== 'string' || template.trim().length === 0) {
+      throw new InvalidConnectorSettingsError(`"${key}.${datasetKey}" must be a non-empty SQL string.`);
+    }
+    if (template.length > MAX_HISTORICAL_QUERY_TEMPLATE_LENGTH) {
+      throw new InvalidConnectorSettingsError(`"${key}.${datasetKey}" must be at most ${MAX_HISTORICAL_QUERY_TEMPLATE_LENGTH} characters.`);
+    }
+  }
+}
+
 const CONNECTOR_SETTINGS_SCHEMA: Record<ConnectorSettingKey, SettingValidator> = {
   name: stringSetting(200),
   description: stringSetting(2000),
@@ -84,6 +104,8 @@ const CONNECTOR_SETTINGS_SCHEMA: Record<ConnectorSettingKey, SettingValidator> =
   contactViewerServerPort: portSetting,
   contactViewerUrlOverride: stringSetting(2048),
   reasonCodeSourceField: stringSetting(200),
+  historicalQueries: historicalQueriesSetting,
+  historicalDatabaseSsl: booleanSetting,
 };
 
 export const DEFAULT_REASON_CODE_SOURCE_FIELD = 'reasonCode';
