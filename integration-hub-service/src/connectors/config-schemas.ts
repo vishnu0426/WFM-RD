@@ -12,12 +12,14 @@ import { InvalidConnectorSettingsError } from './errors/invalid-connector-settin
  * before being persisted - this whitelist doesn't bypass that guard, it
  * runs in front of it.
  *
- * Recorder/Recorder-TDM/Device-IP/SIP-tracking settings are deliberately
- * NOT modeled here - see the plan's "Integration Servers" exclusion: no
- * on-prem telephony-hardware config concept exists in this SaaS
- * architecture, so exposing those fields would mean inventing backend
- * behavior nothing downstream reads. The Data Sources UI shows those
- * sections as BACKEND GAP instead.
+ * Recorder/Recorder-TDM/Device-IP/SIP-tracking settings (`recorderSettings`/
+ * `recorderTdmSettings`/`deviceIpConfiguration`/`sipCallTracking` below) ARE
+ * modeled here, on explicit request, as a real registry/documentation
+ * capability - not a control plane. No on-prem telephony-hardware agent
+ * exists anywhere in this platform to act on these values; see
+ * `IntegrationServer`'s own doc comment for what's real about this (a
+ * tenant's own deployment topology, persisted and auditable) versus what
+ * isn't (nothing here opens an RMI/TDM/SIP connection).
  */
 export type ConnectorSettingKey =
   | 'name'
@@ -41,7 +43,12 @@ export type ConnectorSettingKey =
   /** `NatsAcdAdapter`'s own real, required topology for subscribing to a customer's on-prem NATS bus - see that adapter's own doc comment for why `useJetStream: true` requires `streamName`/`durableName`. Auth material (`authType`/token/user-pass/nkey/creds/TLS CA) is separate, Vault-backed credential material, never in this settings object. */
   | 'onpremNats'
   /** `SftpCsvHistoricalAdapter`'s own real, required per-dataset file pattern: `{ [datasetKey]: { remoteDir, fileNamePattern, delimiter?, hasHeaderRow? } }` - see that adapter's own doc comment for the "{date}" substitution and header-row conventions. Auth (host/port/username/password-or-privateKey) is separate, Vault-backed credential material. */
-  | 'sftpCsv';
+  | 'sftpCsv'
+  /** Integration Servers' per-connector settings - real field names/option values researched against Verint WFO/EMT's actual admin screens (see `IntegrationServer`'s own doc comment for sources). A registry/documentation value, same posture as every field in this schema - see that entity's doc comment for why nothing on this platform acts on these values. */
+  | 'recorderSettings'
+  | 'recorderTdmSettings'
+  | 'deviceIpConfiguration'
+  | 'sipCallTracking';
 
 type SettingValidator = (value: unknown, key: string) => void;
 
@@ -187,6 +194,103 @@ function sftpCsvSetting(value: unknown, key: string): void {
   }
 }
 
+function enumSetting(allowed: readonly string[]): SettingValidator {
+  return (value, key) => {
+    if (typeof value !== 'string' || !allowed.includes(value)) {
+      throw new InvalidConnectorSettingsError(`"${key}" must be one of: ${allowed.join(', ')}.`);
+    }
+  };
+}
+
+function positiveIntSetting(value: unknown, key: string): void {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
+    throw new InvalidConnectorSettingsError(`"${key}" must be a non-negative integer.`);
+  }
+}
+
+/** Real field names/option values researched against Verint WFO/EMT's actual "Phone data source" admin screen - https://wfo.mt2.verintcloudservices.com/OnlineHelp/en_US/wfm/datasource_27003_settings.htm (confirmed live during implementation). See `IntegrationServer`'s own doc comment for the registry-not-control-plane framing. */
+const SEATING_ARRANGEMENTS = ['fixed', 'free', 'hybrid'] as const;
+const RECORDING_RESOURCE_ALLOCATION_BEHAVIORS = ['ignore_line', 'line_first', 'line_exclusive'] as const;
+const CONTACT_POLICY_TYPES = ['follow_the_call', 'back_office_contact_per_call'] as const;
+const SESSION_AUDITING_POLICIES = ['disabled', 'missed_recordings', 'full_switch'] as const;
+const RECORDER_AUDIO_LOCATION_ALLOCATIONS = ['inactive', 'from_signaling', 'from_media'] as const;
+
+function recorderSettingsSetting(value: unknown, key: string): void {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new InvalidConnectorSettingsError(`"${key}" must be an object.`);
+  }
+  const v = value as Record<string, unknown>;
+  const optionalIntFields = [
+    'maximumAllowedExtensions', 'persistAgentStateOnShutDownMinutes', 'minimumSessionLengthSeconds',
+    'rollbackPeriodMinutes', 'rtpStartOverlayMs', 'rtpEndOverlayMs', 'longCallDurationMinutes',
+    'longHoldDurationMinutes', 'alarmDeviceNotRecordedCallCount', 'alarmDeviceNotRecordedMs',
+    'serviceObserveFailCountThreshold',
+  ];
+  for (const field of optionalIntFields) {
+    if (v[field] !== undefined) positiveIntSetting(v[field], `${key}.${field}`);
+  }
+  const optionalBoolFields = ['rtpDetectionEnabled', 'alwaysReportExtensionAsPrimary', 'raiseAlarmForOutOfServiceDevices', 'keepDuplicateRecording'];
+  for (const field of optionalBoolFields) {
+    if (v[field] !== undefined) booleanSetting(v[field], `${key}.${field}`);
+  }
+  if (v.seatingArrangement !== undefined) enumSetting(SEATING_ARRANGEMENTS)(v.seatingArrangement, `${key}.seatingArrangement`);
+  if (v.recordingResourceAllocationBehavior !== undefined) {
+    enumSetting(RECORDING_RESOURCE_ALLOCATION_BEHAVIORS)(v.recordingResourceAllocationBehavior, `${key}.recordingResourceAllocationBehavior`);
+  }
+  if (v.contactPolicyType !== undefined) enumSetting(CONTACT_POLICY_TYPES)(v.contactPolicyType, `${key}.contactPolicyType`);
+  if (v.sessionAuditingPolicy !== undefined) enumSetting(SESSION_AUDITING_POLICIES)(v.sessionAuditingPolicy, `${key}.sessionAuditingPolicy`);
+  if (v.recorderAllocationBasedOnAudioLocation !== undefined) {
+    enumSetting(RECORDER_AUDIO_LOCATION_ALLOCATIONS)(v.recorderAllocationBasedOnAudioLocation, `${key}.recorderAllocationBasedOnAudioLocation`);
+  }
+}
+
+function recorderTdmSettingsSetting(value: unknown, key: string): void {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new InvalidConnectorSettingsError(`"${key}" must be an object.`);
+  }
+  const v = value as Record<string, unknown>;
+  for (const field of ['offHookDelayMs', 'onHookDelayMs', 'interDigitDelayMs', 'periodBetweenServiceObserveMs']) {
+    if (v[field] !== undefined) positiveIntSetting(v[field], `${key}.${field}`);
+  }
+  for (const field of ['recordExtensionsForInternalCalls', 'recordIpTrunks']) {
+    if (v[field] !== undefined) booleanSetting(v[field], `${key}.${field}`);
+  }
+  if (v.serviceObserveString !== undefined) stringSetting(200)(v.serviceObserveString, `${key}.serviceObserveString`);
+}
+
+const DEVICE_IP_SERVER_TYPES = ['pbx_side_near_end', 'pstn_side_far_end'] as const;
+
+function deviceIpConfigurationSetting(value: unknown, key: string): void {
+  if (!Array.isArray(value)) {
+    throw new InvalidConnectorSettingsError(`"${key}" must be an array of { serverType, ipAddressOrHostName }.`);
+  }
+  value.forEach((entry, index) => {
+    if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
+      throw new InvalidConnectorSettingsError(`"${key}[${index}]" must be an object.`);
+    }
+    const e = entry as Record<string, unknown>;
+    enumSetting(DEVICE_IP_SERVER_TYPES)(e.serverType, `${key}[${index}].serverType`);
+    if (!isNonEmptyString(e.ipAddressOrHostName)) {
+      throw new InvalidConnectorSettingsError(`"${key}[${index}].ipAddressOrHostName" must be a non-empty string.`);
+    }
+  });
+}
+
+function sipCallTrackingSetting(value: unknown, key: string): void {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new InvalidConnectorSettingsError(`"${key}" must be an object.`);
+  }
+  const v = value as Record<string, unknown>;
+  for (const field of ['trackSignalingCalls', 'separateCtiAndSignalingApiCommands']) {
+    if (v[field] !== undefined) booleanSetting(v[field], `${key}.${field}`);
+  }
+  // Research confirmed this field's real name but not its enumerated option
+  // values (unlike every enum above) - tenant-authored free text rather
+  // than a fabricated allowlist, same honest posture as `shiftOperation`/
+  // `DataSourceGroup.type` elsewhere in this codebase.
+  if (v.signalingRecordingMode !== undefined) stringSetting(200)(v.signalingRecordingMode, `${key}.signalingRecordingMode`);
+}
+
 const CONNECTOR_SETTINGS_SCHEMA: Record<ConnectorSettingKey, SettingValidator> = {
   name: stringSetting(200),
   description: stringSetting(2000),
@@ -203,6 +307,10 @@ const CONNECTOR_SETTINGS_SCHEMA: Record<ConnectorSettingKey, SettingValidator> =
   five9: five9Setting,
   onpremNats: onpremNatsSetting,
   sftpCsv: sftpCsvSetting,
+  recorderSettings: recorderSettingsSetting,
+  recorderTdmSettings: recorderTdmSettingsSetting,
+  deviceIpConfiguration: deviceIpConfigurationSetting,
+  sipCallTracking: sipCallTrackingSetting,
 };
 
 export const DEFAULT_REASON_CODE_SOURCE_FIELD = 'reasonCode';

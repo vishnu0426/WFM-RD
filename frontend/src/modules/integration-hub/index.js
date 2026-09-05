@@ -42,7 +42,7 @@ const TABS = {
 
 /* Screens with a drawer (state.drawer !== null), tried in this order —
    same convention as identity-org/index.js's DRAWER_MODULES. */
-const DRAWER_MODULES = [DataSources, DataSourceGroups, Agents, ReasonCodes, HistoricalData, Scorecards];
+const DRAWER_MODULES = [IntegrationServer, DataSources, DataSourceGroups, Agents, ReasonCodes, HistoricalData, Scorecards];
 
 export function render(state) {
   const mod = TABS[state.tab];

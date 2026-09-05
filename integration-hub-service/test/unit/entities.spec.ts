@@ -21,11 +21,11 @@ import { entities } from '../../src/database/entities';
  * TypeScript compile alone would not.
  */
 describe('database entities', () => {
-  it('registers all seven §2.1 entities plus WP3\'s ReasonCode/DataSourceGroup/DataSourceGroupQueue, WP5\'s HistoricalBackfillChunk, and the Database historical-adapter follow-up\'s HistoricalRecord, scoped to the integration_hub schema', () => {
-    expect(entities).toHaveLength(12);
+  it('registers all seven §2.1 entities plus WP3\'s ReasonCode/DataSourceGroup/DataSourceGroupQueue, WP5\'s HistoricalBackfillChunk, the Database historical-adapter follow-up\'s HistoricalRecord, and the Integration Servers registry\'s IntegrationServer/IntegrationConnectorServer, scoped to the integration_hub schema', () => {
+    expect(entities).toHaveLength(14);
     const entitySet = new Set<unknown>(entities);
     const tables = getMetadataArgsStorage().tables.filter((t) => entitySet.has(t.target));
-    expect(tables).toHaveLength(12);
+    expect(tables).toHaveLength(14);
     for (const table of tables) {
       expect(table.schema).toBe('integration_hub');
     }

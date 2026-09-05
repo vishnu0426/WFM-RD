@@ -15,6 +15,7 @@ import { FieldMappingsService } from './field-mappings.service';
 import { FieldAuthorityPoliciesService } from './field-authority-policies.service';
 import { ReasonCodesService } from './reason-codes.service';
 import { DataSourceGroupsService } from './data-source-groups.service';
+import { IntegrationServersService } from './integration-servers.service';
 import { ForecastingHttpClientModule } from '../forecasting/forecasting-http-client.module';
 
 @Module({
@@ -35,6 +36,7 @@ import { ForecastingHttpClientModule } from '../forecasting/forecasting-http-cli
     FieldAuthorityPoliciesService,
     ReasonCodesService,
     DataSourceGroupsService,
+    IntegrationServersService,
     AccessTokenGuard,
     PermissionsGuard,
     PlatformAdminGuard,
@@ -45,6 +47,7 @@ import { ForecastingHttpClientModule } from '../forecasting/forecasting-http-cli
     FieldAuthorityPoliciesService,
     ReasonCodesService,
     DataSourceGroupsService,
+    IntegrationServersService,
   ],
 })
 export class IntegrationConnectorsModule {}

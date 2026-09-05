@@ -21,6 +21,7 @@ import { FieldAuthorityPolicyResolver } from '../connectors/graphql/field-author
 import { ConnectorHealthResolver } from '../connectors/graphql/connector-health.resolver';
 import { ReasonCodeResolver } from '../connectors/graphql/reason-code.resolver';
 import { DataSourceGroupResolver } from '../connectors/graphql/data-source-group.resolver';
+import { IntegrationServerResolver } from '../connectors/graphql/integration-server.resolver';
 
 /** GraphQL-side counterpart to `DomainErrorFilter` (REST) - own copy of every other service's own `formatGraphQLError`. */
 function formatGraphQLError(formattedError: GraphQLFormattedError, error: unknown): GraphQLFormattedError {
@@ -97,6 +98,7 @@ function formatGraphQLError(formattedError: GraphQLFormattedError, error: unknow
     ConnectorHealthResolver,
     ReasonCodeResolver,
     DataSourceGroupResolver,
+    IntegrationServerResolver,
     AccessTokenGuard,
     PermissionsGuard,
     TenantTokenMatchGuard,

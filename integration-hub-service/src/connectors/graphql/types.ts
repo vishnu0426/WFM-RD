@@ -15,6 +15,8 @@ import {
 import { ReasonCode } from '../../integrations/entities/reason-code.entity';
 import { DataSourceGroup } from '../../integrations/entities/data-source-group.entity';
 import { DataSourceGroupQueue } from '../../integrations/entities/data-source-group-queue.entity';
+import { IntegrationServer, IntegrationServerRole } from '../../integrations/entities/integration-server.entity';
+import { IntegrationConnectorServer } from '../../integrations/entities/integration-connector-server.entity';
 import { CreateConnectorResult } from '../integration-connectors.service';
 
 registerEnumType(ConnectorType, { name: 'ConnectorType' });
@@ -23,6 +25,7 @@ registerEnumType(SyncJobStatus, { name: 'SyncJobStatus' });
 registerEnumType(FieldMappingAuthority, { name: 'FieldMappingAuthority' });
 registerEnumType(FieldAuthoritySource, { name: 'FieldAuthoritySource' });
 registerEnumType(FieldConflictAction, { name: 'FieldConflictAction' });
+registerEnumType(IntegrationServerRole, { name: 'IntegrationServerRole' });
 
 /** §3.1's named field set exactly - never `config` (the credential-reference-bearing column, ADR-0134), which no query in §3.1 exposes. */
 @ObjectType('IntegrationConnector')
@@ -253,6 +256,70 @@ export class DataSourceGroupQueueResult {
 
   @Field(() => ID)
   ccQueueId!: string;
+}
+
+@ObjectType('IntegrationServer')
+export class IntegrationServerResult {
+  @Field(() => ID)
+  id!: string;
+
+  @Field()
+  name!: string;
+
+  @Field(() => String, { nullable: true })
+  description!: string | null;
+
+  @Field()
+  serverName!: string;
+
+  @Field(() => Number, { nullable: true })
+  portNumber!: number | null;
+
+  @Field(() => Number, { nullable: true })
+  httpsPortNumber!: number | null;
+
+  @Field(() => String, { nullable: true })
+  httpAlias!: string | null;
+
+  @Field()
+  blocked!: boolean;
+
+  @Field(() => [IntegrationServerRole])
+  roles!: IntegrationServerRole[];
+
+  @Field(() => Date)
+  updatedAt!: Date;
+}
+
+@ObjectType('IntegrationConnectorServer')
+export class IntegrationConnectorServerResult {
+  @Field(() => ID)
+  id!: string;
+
+  @Field(() => ID)
+  connectorId!: string;
+
+  @Field(() => ID)
+  serverId!: string;
+}
+
+export function toIntegrationServerResult(row: IntegrationServer): IntegrationServerResult {
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    serverName: row.serverName,
+    portNumber: row.portNumber,
+    httpsPortNumber: row.httpsPortNumber,
+    httpAlias: row.httpAlias,
+    blocked: row.blocked,
+    roles: row.roles,
+    updatedAt: row.updatedAt,
+  };
+}
+
+export function toIntegrationConnectorServerResult(row: IntegrationConnectorServer): IntegrationConnectorServerResult {
+  return { id: row.id, connectorId: row.connectorId, serverId: row.serverId };
 }
 
 export function toReasonCodeResult(row: ReasonCode): ReasonCodeResult {

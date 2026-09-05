@@ -8,7 +8,7 @@ import { Api } from '../../../core/api.js';
 import { esc, errMsg } from '../../../core/dom.js';
 import { doRerender } from '../../../app/rerender.js';
 import { toast } from '../../../app/toast.js';
-import { pageHead, sec, empty, stBadge, drawerShell, fmtDt, gap } from '../../identity-org/shared/ui.js';
+import { pageHead, sec, empty, stBadge, drawerShell, fmtDt } from '../../identity-org/shared/ui.js';
 
 const CONNECTOR_TYPES = ['HRIS', 'PAYROLL', 'ACD', 'CRM', 'CUSTOM_WEBHOOK', 'DATABASE'];
 const BATCH_TYPES = new Set(['HRIS', 'PAYROLL', 'CRM']);
@@ -29,6 +29,154 @@ const NATS_AUTH_TYPES = [
   { id: 'nkey', label: 'NKey Seed' },
   { id: 'creds', label: 'Credentials File (JWT)' },
 ];
+
+/* Recorder / Recorder TDM / Device IP / SIP Call Tracking — real field
+   names and option values researched against Verint WFO/EMT's actual
+   "Phone data source" admin screen (confirmed live during implementation:
+   https://wfo.mt2.verintcloudservices.com/OnlineHelp/en_US/wfm/datasource_27003_settings.htm).
+   Applies to ACD/phone data sources broadly (any provider), not one
+   vendor — real, discrete fields per this whole module's "no generic UI"
+   principle, not a JSON blob. This is a registry, not a control plane —
+   nothing on this platform reads these values to control real recording
+   hardware; see integration-hub-service's IntegrationServer entity for
+   the full framing. */
+const RECORDER_FIELDS = [
+  { id: 'seatingArrangement', label: 'Seating Arrangement', type: 'select', options: ['fixed', 'free', 'hybrid'] },
+  { id: 'maximumAllowedExtensions', label: 'Maximum Allowed Extensions', type: 'number' },
+  { id: 'persistAgentStateOnShutDownMinutes', label: 'Persist Agent State on Shut Down (minutes)', type: 'number' },
+  { id: 'minimumSessionLengthSeconds', label: 'Minimum Session Length (seconds)', type: 'number' },
+  { id: 'rollbackPeriodMinutes', label: 'Rollback Period (minutes)', type: 'number' },
+  { id: 'rtpDetectionEnabled', label: 'RTP Detection', type: 'checkbox' },
+  { id: 'rtpStartOverlayMs', label: 'RTP Start Overlay (ms)', type: 'number' },
+  { id: 'rtpEndOverlayMs', label: 'RTP End Overlay (ms)', type: 'number' },
+  { id: 'longCallDurationMinutes', label: 'Long Call Duration (minutes)', type: 'number' },
+  { id: 'longHoldDurationMinutes', label: 'Long Hold Duration (minutes)', type: 'number' },
+  { id: 'recordingResourceAllocationBehavior', label: 'Recording Resource Allocation Behavior', type: 'select', options: ['ignore_line', 'line_first', 'line_exclusive'] },
+  { id: 'alwaysReportExtensionAsPrimary', label: 'Always Report Extension as Primary Extension', type: 'checkbox' },
+  { id: 'contactPolicyType', label: 'Contact Policy Type', type: 'select', options: ['follow_the_call', 'back_office_contact_per_call'] },
+  { id: 'raiseAlarmForOutOfServiceDevices', label: 'Raise Alarm for Out Of Service Devices', type: 'checkbox' },
+  { id: 'alarmDeviceNotRecordedCallCount', label: 'Alarm — Device Not Recorded Call Count', type: 'number' },
+  { id: 'alarmDeviceNotRecordedMs', label: 'Alarm — Device Not Recorded (ms)', type: 'number' },
+  { id: 'serviceObserveFailCountThreshold', label: 'Service Observe Fail Count Threshold', type: 'number' },
+  { id: 'sessionAuditingPolicy', label: 'Session Auditing Policy', type: 'select', options: ['disabled', 'missed_recordings', 'full_switch'] },
+  { id: 'keepDuplicateRecording', label: 'Keep Duplicate Recording', type: 'checkbox' },
+  { id: 'recorderAllocationBasedOnAudioLocation', label: 'Recorder Allocation Based On Audio Location', type: 'select', options: ['inactive', 'from_signaling', 'from_media'] },
+];
+const RECORDER_TDM_FIELDS = [
+  { id: 'offHookDelayMs', label: 'Off Hook Delay (ms)', type: 'number' },
+  { id: 'onHookDelayMs', label: 'On Hook Delay (ms)', type: 'number' },
+  { id: 'serviceObserveString', label: 'Service Observe String', type: 'text' },
+  { id: 'interDigitDelayMs', label: 'Inter Digit Delay (ms)', type: 'number' },
+  { id: 'periodBetweenServiceObserveMs', label: 'Period Between Service Observe (ms)', type: 'number' },
+  { id: 'recordExtensionsForInternalCalls', label: 'Record Extensions for Internal Calls', type: 'checkbox' },
+  { id: 'recordIpTrunks', label: 'Record IP Trunks', type: 'checkbox' },
+];
+const SIP_CALL_TRACKING_FIELDS = [
+  { id: 'trackSignalingCalls', label: 'Track Signaling Calls', type: 'checkbox' },
+  { id: 'separateCtiAndSignalingApiCommands', label: 'Separate CTI and Signaling API Commands', type: 'checkbox' },
+  // Verint's own field, but its real enumerated option values weren't
+  // confirmable during research (unlike every select field above) —
+  // tenant-authored free text rather than a guessed allowlist.
+  { id: 'signalingRecordingMode', label: 'Signaling Recording Mode (tenant-authored — real option values not confirmed in public docs)', type: 'text' },
+];
+const DEVICE_IP_SERVER_TYPES = [
+  { id: 'pbx_side_near_end', label: 'PBX Side - Near End' },
+  { id: 'pstn_side_far_end', label: 'PSTN Side - Far End' },
+];
+
+function structuredFieldPrefixKey(prefix, fieldId) {
+  return `${prefix}${fieldId[0].toUpperCase()}${fieldId.slice(1)}`;
+}
+
+function renderStructuredFields(fields, prefix, d) {
+  return fields.map((f) => {
+    const key = structuredFieldPrefixKey(prefix, f.id);
+    return `<div class="field" style="margin-top:10px">
+      ${f.type === 'checkbox'
+        ? `<label><input type="checkbox" data-wf="ds-structured-field" data-id="${key}" ${d[key] ? 'checked' : ''} /> ${esc(f.label)}</label>`
+        : `<label>${esc(f.label)}</label>
+           ${f.type === 'select'
+             ? `<select data-wf="ds-structured-field" data-id="${key}"><option value="">—</option>${f.options.map((o) => `<option value="${o}" ${d[key] === o ? 'selected' : ''}>${o.replace(/_/g, ' ')}</option>`).join('')}</select>`
+             : `<input type="${f.type === 'number' ? 'number' : 'text'}" data-wf="ds-structured-field" data-id="${key}" value="${esc(d[key])}" />`}`}
+    </div>`;
+  }).join('');
+}
+
+function structuredDraftDefaults(fields, prefix) {
+  const d = {};
+  fields.forEach((f) => { d[structuredFieldPrefixKey(prefix, f.id)] = f.type === 'checkbox' ? false : ''; });
+  return d;
+}
+
+function structuredDraftFrom(fields, prefix, source) {
+  const d = {};
+  fields.forEach((f) => {
+    const key = structuredFieldPrefixKey(prefix, f.id);
+    const v = (source || {})[f.id];
+    d[key] = f.type === 'checkbox' ? !!v : (v ?? '');
+  });
+  return d;
+}
+
+function structuredSettingsFrom(fields, prefix, d) {
+  const out = {};
+  fields.forEach((f) => {
+    const key = structuredFieldPrefixKey(prefix, f.id);
+    const v = d[key];
+    if (f.type === 'checkbox') { out[f.id] = !!v; return; }
+    if (v === '') return;
+    out[f.id] = f.type === 'number' ? Number(v) : v;
+  });
+  return out;
+}
+
+const INTEGRATION_SERVERS_QUERY = `query { integrationServers { id name serverName } }`;
+const SERVERS_FOR_CONNECTOR_QUERY = `query($connectorId: ID!) { integrationServersForConnector(connectorId: $connectorId) { id serverId } }`;
+const ASSOCIATE_SERVER_MUTATION = `mutation($connectorId: ID!, $serverId: ID!) { associateIntegrationServer(connectorId: $connectorId, serverId: $serverId) { id } }`;
+const DISASSOCIATE_SERVER_MUTATION = `mutation($connectorId: ID!, $serverId: ID!) { disassociateIntegrationServer(connectorId: $connectorId, serverId: $serverId) }`;
+
+function loadAllIntegrationServers(state) {
+  state.wf.allIntegrationServers = { loading: true };
+  Api.integrationHubGql(INTEGRATION_SERVERS_QUERY, {})
+    .then((data) => { state.wf.allIntegrationServers = { rows: data.integrationServers }; doRerender(); })
+    .catch((err) => { state.wf.allIntegrationServers = { error: errMsg(err) }; doRerender(); });
+}
+
+function loadServersForConnector(state, connectorId) {
+  state.wf.dsServerAssociations = { loading: true };
+  Api.integrationHubGql(SERVERS_FOR_CONNECTOR_QUERY, { connectorId })
+    .then((data) => { state.wf.dsServerAssociations = { rows: data.integrationServersForConnector }; doRerender(); })
+    .catch((err) => { state.wf.dsServerAssociations = { error: errMsg(err) }; doRerender(); });
+}
+
+function renderServerAssociations(state, connectorId) {
+  if (!state.wf.allIntegrationServers) loadAllIntegrationServers(state);
+  if (!state.wf.dsServerAssociations) loadServersForConnector(state, connectorId);
+  const all = (state.wf.allIntegrationServers && state.wf.allIntegrationServers.rows) || [];
+  const assoc = state.wf.dsServerAssociations;
+  if (!assoc || assoc.loading) return `<div class="skel" style="height:20px"></div>`;
+  if (assoc.error) return `<p class="muted">${esc(assoc.error)}</p>`;
+  const associatedIds = new Set(assoc.rows.map((a) => a.serverId));
+  const available = all.filter((s) => !associatedIds.has(s.id));
+  return `
+    <div class="field">
+      <div style="display:flex;gap:8px">
+        <select style="flex:1" data-wf="ds-server-assoc-select">
+          <option value="">Select a registered Integration Server…</option>
+          ${available.map((s) => `<option value="${s.id}">${esc(s.name)} (${esc(s.serverName)})</option>`).join('')}
+        </select>
+        <button class="btn" data-wf="ds-server-assoc-add">Associate</button>
+      </div>
+    </div>
+    ${assoc.rows.length === 0 ? '<p class="muted" style="margin-top:8px">No registered servers associated with this data source yet.</p>' : `
+      <table class="data" style="margin-top:10px"><thead><tr><th>Server</th><th></th></tr></thead><tbody>
+        ${assoc.rows.map((a) => {
+          const s = all.find((x) => x.id === a.serverId);
+          return `<tr><td>${esc(s ? `${s.name} (${s.serverName})` : a.serverId)}</td><td><button class="btn btn-sm btn-danger" data-wf="ds-server-assoc-remove" data-id="${a.serverId}">Remove</button></td></tr>`;
+        }).join('')}
+      </tbody></table>`}
+  `;
+}
 
 const LIST_QUERY = `query { connectors { id connectorType provider status lastSyncAt lastSyncStatus settings } }`;
 const CREATE_MUTATION = `mutation Create(
@@ -138,6 +286,14 @@ function settingsDraftFrom(connector) {
       onpremNatsDurableName: n.durableName || '',
       onpremNatsAckWaitSeconds: n.ackWaitSeconds ?? '',
     });
+  }
+  if (connector.connectorType === 'ACD') {
+    Object.assign(d, structuredDraftFrom(RECORDER_FIELDS, 'rec', s.recorderSettings));
+    Object.assign(d, structuredDraftFrom(RECORDER_TDM_FIELDS, 'tdm', s.recorderTdmSettings));
+    Object.assign(d, structuredDraftFrom(SIP_CALL_TRACKING_FIELDS, 'sip', s.sipCallTracking));
+    d.deviceIpConfigs = Array.isArray(s.deviceIpConfiguration)
+      ? s.deviceIpConfiguration.map((e) => ({ serverType: e.serverType || '', ipAddressOrHostName: e.ipAddressOrHostName || '' }))
+      : [];
   }
   return d;
 }
@@ -302,16 +458,31 @@ export function renderDrawer(state) {
         <div class="field" style="margin-top:10px"><label>Ack Wait (seconds, optional)</label><input type="number" data-wf="ds-settings-field" data-id="onpremNatsAckWaitSeconds" value="${esc(d.onpremNatsAckWaitSeconds)}" /></div>
       ` : `<p class="hint">Without JetStream, an event published while this platform is disconnected is not redelivered — confirm this is acceptable, or enable JetStream on the customer's server.</p>`}
       ` : ''}
-      <h4 style="margin:20px 0 8px">Recorder Settings</h4>
-      <p>${gap('No recorder/telephony-hardware config concept exists in this SaaS architecture — nothing downstream reads these fields, so they are not shown.')}</p>
+      ${connector.connectorType === 'ACD' ? `
+      <p class="hint" style="margin-top:16px">Recorder/TDM/Device IP/SIP Call Tracking below are a real, persisted registry of your own on-prem recording infrastructure (real field names from Verint WFO/EMT's own admin screens) — not a live control plane. Nothing on this platform acts on these values; see Integration Servers for the same framing.</p>
+      <h4 style="margin:16px 0 8px">Recorder Settings</h4>
+      ${renderStructuredFields(RECORDER_FIELDS, 'rec', d)}
       <h4 style="margin:20px 0 8px">Recorder TDM Settings</h4>
-      <p>${gap('Same as Recorder Settings above.')}</p>
+      ${renderStructuredFields(RECORDER_TDM_FIELDS, 'tdm', d)}
       <h4 style="margin:20px 0 8px">Device IP Configuration</h4>
-      <p>${gap('No device-IP/hardware-address concept exists for this platform\'s connectors.')}</p>
+      ${d.deviceIpConfigs.map((e, i) => `
+        <div class="grid-2" style="margin-top:10px">
+          <div class="field"><label>Server Type</label>
+            <select data-wf="ds-device-ip-field" data-id="${i}:serverType">${DEVICE_IP_SERVER_TYPES.map((t) => `<option value="${t.id}" ${e.serverType === t.id ? 'selected' : ''}>${esc(t.label)}</option>`).join('')}</select>
+          </div>
+          <div class="field"><label>IP Address / Host Name</label>
+            <div style="display:flex;gap:8px">
+              <input style="flex:1" data-wf="ds-device-ip-field" data-id="${i}:ipAddressOrHostName" value="${esc(e.ipAddressOrHostName)}" />
+              <button class="btn btn-sm btn-danger" data-wf="ds-device-ip-remove" data-id="${i}">Remove</button>
+            </div>
+          </div>
+        </div>`).join('')}
+      <button class="btn btn-sm" style="margin-top:10px" data-wf="ds-device-ip-add">+ Add Device IP Configuration</button>
       <h4 style="margin:20px 0 8px">SIP Call Tracking</h4>
-      <p>${gap('No SIP signaling-layer concept exists — real-time capture is via the ACD provider\'s own API/relay, not raw SIP.')}</p>
+      ${renderStructuredFields(SIP_CALL_TRACKING_FIELDS, 'sip', d)}
       <h4 style="margin:20px 0 8px">Integration Service Associations</h4>
-      <p>${gap('No Enterprise/Site/Group/Recorder hierarchy exists in this platform\'s data model.')}</p>
+      ${renderServerAssociations(state, connector.id)}
+      ` : ''}
       ${testResultBadge(state.dsTestResult)}
       `,
       `<button class="btn" data-wf="close-drawer">Close</button><button class="btn" data-wf="ds-settings-revert" ${dirty ? '' : 'disabled'}>Revert</button>`,
@@ -384,6 +555,7 @@ export function handle(state, act, id, value) {
     state.dsDetailId = id;
     state.dsSettingsDraft = null;
     state.dsTestResult = null;
+    state.wf.dsServerAssociations = null;
     state.drawer = 'ds-detail';
     return true;
   }
@@ -398,6 +570,40 @@ export function handle(state, act, id, value) {
     // same "toggle, don't trust the DOM value" pattern this app's other
     // dedicated toggle actions (e.g. sc-maintenance-toggle) already use.
     state.dsSettingsDraft[id] = isCheckboxField ? !state.dsSettingsDraft[id] : value;
+    return true;
+  }
+  if (act === 'ds-structured-field') {
+    const [prefix, fields] = id.startsWith('rec') ? ['rec', RECORDER_FIELDS] : id.startsWith('tdm') ? ['tdm', RECORDER_TDM_FIELDS] : ['sip', SIP_CALL_TRACKING_FIELDS];
+    const field = fields.find((f) => structuredFieldPrefixKey(prefix, f.id) === id);
+    const isCheckboxField = field && field.type === 'checkbox';
+    state.dsSettingsDraft[id] = isCheckboxField ? !state.dsSettingsDraft[id] : value;
+    return true;
+  }
+  if (act === 'ds-device-ip-field') {
+    const [indexStr, field] = id.split(':');
+    state.dsSettingsDraft.deviceIpConfigs[Number(indexStr)][field] = value;
+    return true;
+  }
+  if (act === 'ds-device-ip-add') {
+    state.dsSettingsDraft.deviceIpConfigs.push({ serverType: DEVICE_IP_SERVER_TYPES[0].id, ipAddressOrHostName: '' });
+    return true;
+  }
+  if (act === 'ds-device-ip-remove') {
+    state.dsSettingsDraft.deviceIpConfigs.splice(Number(id), 1);
+    return true;
+  }
+  if (act === 'ds-server-assoc-select') { state.dsServerAssocSelectId = value; return true; }
+  if (act === 'ds-server-assoc-add') {
+    if (!state.dsServerAssocSelectId) { toast('Select a server first.'); return true; }
+    Api.integrationHubGql(ASSOCIATE_SERVER_MUTATION, { connectorId: state.dsDetailId, serverId: state.dsServerAssocSelectId })
+      .then(() => { toast('Server associated.'); state.wf.dsServerAssociations = null; doRerender(); })
+      .catch((err) => toast(errMsg(err)));
+    return true;
+  }
+  if (act === 'ds-server-assoc-remove') {
+    Api.integrationHubGql(DISASSOCIATE_SERVER_MUTATION, { connectorId: state.dsDetailId, serverId: id })
+      .then(() => { toast('Server disassociated.'); state.wf.dsServerAssociations = null; doRerender(); })
+      .catch((err) => toast(errMsg(err)));
     return true;
   }
   if (act === 'ds-settings-revert') {
@@ -440,6 +646,15 @@ export function handle(state, act, id, value) {
         ackWaitSeconds: d.onpremNatsAckWaitSeconds === '' ? undefined : Number(d.onpremNatsAckWaitSeconds),
       };
       Object.keys(settings.onpremNats).forEach((k) => { if (settings.onpremNats[k] === undefined) delete settings.onpremNats[k]; });
+    }
+    if (connectorForSave && connectorForSave.connectorType === 'ACD') {
+      settings.recorderSettings = structuredSettingsFrom(RECORDER_FIELDS, 'rec', d);
+      settings.recorderTdmSettings = structuredSettingsFrom(RECORDER_TDM_FIELDS, 'tdm', d);
+      settings.sipCallTracking = structuredSettingsFrom(SIP_CALL_TRACKING_FIELDS, 'sip', d);
+      for (const e of d.deviceIpConfigs) {
+        if (!e.ipAddressOrHostName.trim()) { toast('IP Address / Host Name is required for every Device IP Configuration row.'); return true; }
+      }
+      settings.deviceIpConfiguration = d.deviceIpConfigs.map((e) => ({ serverType: e.serverType, ipAddressOrHostName: e.ipAddressOrHostName.trim() }));
     }
     Object.keys(settings).forEach((k) => { if (settings[k] === null) delete settings[k]; });
     state.wf.saving.dsSettings = true;

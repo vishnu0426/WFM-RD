@@ -111,6 +111,36 @@ type IntegrationConnector {
   status: ConnectorStatus!
 }
 
+type IntegrationConnectorServer {
+  connectorId: ID!
+  id: ID!
+  serverId: ID!
+}
+
+type IntegrationServer {
+  blocked: Boolean!
+  description: String
+  httpAlias: String
+  httpsPortNumber: Float
+  id: ID!
+  name: String!
+  portNumber: Float
+  roles: [IntegrationServerRole!]!
+  serverName: String!
+  updatedAt: DateTime!
+}
+
+enum IntegrationServerRole {
+  CENTRAL_ARCHIVE
+  CONTENT_SERVER
+  IP_ANALYZER
+  IP_RECORDER
+  RECORDER_ADAPTER_PROXY_SERVICE
+  RECORDER_INTEGRATION_SERVICE
+  SCREEN_RECORDER
+  TDM_RECORDER
+}
+
 """
 Arbitrary JSON value (object, array, string, number, boolean, or null).
 """
@@ -118,12 +148,15 @@ scalar JSON
 
 type Mutation {
   addDataSourceGroupQueue(ccQueueId: ID!, groupId: ID!): DataSourceGroupQueue!
+  associateIntegrationServer(connectorId: ID!, serverId: ID!): IntegrationConnectorServer!
   createConnector(additionalConfig: JSON, connectorType: ConnectorType!, credentials: JSON, oauthAuthorizationEndpoint: String, oauthClientId: String, oauthClientSecret: String, oauthRedirectUri: String, oauthScope: String, oauthTokenEndpoint: String, provider: String!): CreateConnectorResult!
   createFieldAuthorityPolicy(authoritativeSource: FieldAuthoritySource!, conflictAction: FieldConflictAction!, connectorId: String!, fieldName: String!): FieldAuthorityPolicy!
   createWebhookSubscription(eventTypes: [String!]!, targetUrl: String!): CreateWebhookSubscriptionResult!
   deleteConnector(connectorId: ID!): IntegrationConnector!
   deleteDataSourceGroup(id: ID!): Boolean!
+  deleteIntegrationServer(id: ID!): Boolean!
   deleteReasonCode(id: ID!): Boolean!
+  disassociateIntegrationServer(connectorId: ID!, serverId: ID!): Boolean!
   removeDataSourceGroupQueue(ccQueueId: ID!, groupId: ID!): Boolean!
   testConnector(connectorId: ID!): ConnectorTestResult!
   testWebhook(subscriptionId: ID!): WebhookDelivery!
@@ -131,6 +164,7 @@ type Mutation {
   updateConnectorSettings(connectorId: ID!, settings: JSON!): IntegrationConnector!
   updateFieldMapping(authority: FieldMappingAuthority, connectorId: String!, sourceField: String!, targetField: String!, transformationRule: JSON): FieldMapping!
   upsertDataSourceGroup(avgWorkTimeSeconds: Float, dataSourceId: ID!, description: String, id: ID, name: String!, type: String): DataSourceGroup!
+  upsertIntegrationServer(blocked: Boolean, description: String, httpAlias: String, httpsPortNumber: Float, id: ID, name: String!, portNumber: Float, roles: [IntegrationServerRole!]!, serverName: String!): IntegrationServer!
   upsertReasonCode(connectorId: ID!, eventMode: String, eventReason: String, externalId: String!, id: ID, origin: String, reasonCode: String!, shiftOperation: String!): ReasonCode!
 }
 
@@ -142,6 +176,8 @@ type Query {
   dataSourceGroups(dataSourceId: ID): [DataSourceGroup!]!
   fieldAuthorityPolicies(connectorId: String!): [FieldAuthorityPolicy!]!
   fieldMappings(connectorId: String!): [FieldMapping!]!
+  integrationServers: [IntegrationServer!]!
+  integrationServersForConnector(connectorId: ID!): [IntegrationConnectorServer!]!
   reasonCodes(connectorId: ID!): [ReasonCode!]!
   syncJobHistory(connectorId: String!, limit: Float): [SyncJob!]!
   webhookDeliveries(limit: Float, subscriptionId: ID!): [WebhookDelivery!]!

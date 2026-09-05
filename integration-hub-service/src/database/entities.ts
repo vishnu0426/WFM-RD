@@ -10,6 +10,8 @@ import { DataSourceGroup } from '../integrations/entities/data-source-group.enti
 import { DataSourceGroupQueue } from '../integrations/entities/data-source-group-queue.entity';
 import { HistoricalBackfillChunk } from '../integrations/entities/historical-backfill-chunk.entity';
 import { HistoricalRecord } from '../integrations/entities/historical-record.entity';
+import { IntegrationServer } from '../integrations/entities/integration-server.entity';
+import { IntegrationConnectorServer } from '../integrations/entities/integration-connector-server.entity';
 
 /**
  * Single source of truth for "every entity in this service," consumed by
@@ -33,6 +35,8 @@ export const entities = [
   DataSourceGroupQueue,
   HistoricalBackfillChunk,
   HistoricalRecord,
+  IntegrationServer,
+  IntegrationConnectorServer,
 ];
 
 export {
@@ -48,4 +52,6 @@ export {
   DataSourceGroupQueue,
   HistoricalBackfillChunk,
   HistoricalRecord,
+  IntegrationServer,
+  IntegrationConnectorServer,
 };

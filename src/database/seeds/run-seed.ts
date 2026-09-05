@@ -210,6 +210,12 @@ const RESOURCES = [
   // covering all six Scorecard* entities' real `:read`/`:write`/`:delete`
   // GraphQL operations (`ScorecardSourceResolver`).
   'scorecard_source',
+  // Integration Servers (integration-hub-service) - a real, persisted
+  // inventory of a tenant's own on-prem recording infrastructure (see
+  // `IntegrationServer`'s own doc comment: a registry/system-of-record,
+  // not a control plane). Real `:read`/`:write`/`:delete` mutations on
+  // `IntegrationServerResolver`.
+  'integration_server',
 ] as const;
 
 /**
