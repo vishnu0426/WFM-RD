@@ -1,11 +1,11 @@
 /* Data Sources → Historical Data. Real backend: integration-hub-service's
    Historical Import/Backfill REST API (WP5) — real chunked/checkpointed
-   SyncJob orchestration. BACKEND GAP, disclosed here rather than hidden:
-   as of this build, zero provider adapters implement a date-ranged
-   historical fetch (confirmed against every existing adapter) — a started
-   import will show as Failed with reason "not supported for this
-   provider yet" rather than a fabricated success. See
-   HistoricalConnectorAdapter's own doc comment for why. */
+   SyncJob orchestration. Real, registered adapters: database (Postgres),
+   mysql, genesys-cloud, avaya-axp, talkdesk, nice-cxone, five9. A provider
+   with no registered adapter still fails cleanly (errorDetails.reason
+   "historical_import_not_supported", surfaced below as BACKEND GAP) rather
+   than a fabricated success — that gate is real and provider-agnostic
+   (HistoricalAdapterRegistry), not a hardcoded allowlist in this file. */
 import { Api } from '../../../core/api.js';
 import { esc, errMsg } from '../../../core/dom.js';
 import { doRerender } from '../../../app/rerender.js';

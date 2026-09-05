@@ -59,7 +59,7 @@ const SETTINGS_FIELDS = [
   { id: 'contactViewerServerPort', label: 'Contact Viewer Server Port', type: 'number' },
   { id: 'contactViewerUrlOverride', label: 'Contact Viewer URL Override', type: 'text' },
   { id: 'historicalDatabaseSsl', label: 'Require TLS for Historical Database Connection', type: 'checkbox' },
-  { id: 'historicalQueries', label: 'Historical Queries (JSON: { datasetKey: sqlTemplate }) — Database provider', type: 'json', placeholder: '{\n  "my_dataset": "SELECT * FROM my_table WHERE ts >= $1 AND ts <= $2"\n}' },
+  { id: 'historicalQueries', label: 'Historical Queries (JSON: { datasetKey: sqlTemplate }) — database (Postgres) provider uses "$1"/"$2" placeholders, mysql provider uses "?" for both — match the one this connector actually uses.', type: 'json', placeholder: '{\n  "my_dataset": "SELECT * FROM my_table WHERE ts >= $1 AND ts <= $2"\n}' },
   { id: 'genesysCloud', label: 'Genesys Cloud Historical Settings (JSON) — genesys-cloud provider', type: 'json', placeholder: '{\n  "queueIds": ["<queue-guid>"],\n  "metrics": ["tHandle", "tWait", "tAbandon"],\n  "granularity": "PT30M"\n}' },
   { id: 'five9', label: 'Five9 Historical Settings (JSON) — five9 provider', type: 'json', placeholder: '{\n  "folderName": "My Reports"\n}' },
 ];

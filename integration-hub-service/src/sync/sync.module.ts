@@ -13,6 +13,7 @@ import { HistoricalBackfillRunnerService } from './historical/historical-backfil
 import { HistoricalImportController } from './historical/historical-import.controller';
 import { HISTORICAL_CONNECTOR_ADAPTERS } from './historical/historical-connector-adapter';
 import { DatabaseHistoricalAdapter } from './historical/providers/database.adapter';
+import { MysqlHistoricalAdapter } from './historical/providers/mysql-historical.adapter';
 import { GenesysCloudHistoricalAdapter } from './historical/providers/genesys-cloud-historical.adapter';
 import { AvayaAxpHistoricalAdapter } from './historical/providers/avaya-axp-historical.adapter';
 import { TalkdeskHistoricalAdapter } from './historical/providers/talkdesk-historical.adapter';
@@ -71,6 +72,7 @@ import { NatsAcdAdapter } from './relay/providers/nats-acd.adapter';
     HistoricalAdapterRegistry,
     HistoricalBackfillRunnerService,
     DatabaseHistoricalAdapter,
+    MysqlHistoricalAdapter,
     GenesysCloudHistoricalAdapter,
     AvayaAxpHistoricalAdapter,
     TalkdeskHistoricalAdapter,
@@ -80,14 +82,16 @@ import { NatsAcdAdapter } from './relay/providers/nats-acd.adapter';
       provide: HISTORICAL_CONNECTOR_ADAPTERS,
       useFactory: (
         database: DatabaseHistoricalAdapter,
+        mysql: MysqlHistoricalAdapter,
         genesys: GenesysCloudHistoricalAdapter,
         avayaAxp: AvayaAxpHistoricalAdapter,
         talkdesk: TalkdeskHistoricalAdapter,
         nice: NiceCxoneHistoricalAdapter,
         five9: Five9HistoricalAdapter,
-      ) => [database, genesys, avayaAxp, talkdesk, nice, five9],
+      ) => [database, mysql, genesys, avayaAxp, talkdesk, nice, five9],
       inject: [
         DatabaseHistoricalAdapter,
+        MysqlHistoricalAdapter,
         GenesysCloudHistoricalAdapter,
         AvayaAxpHistoricalAdapter,
         TalkdeskHistoricalAdapter,
