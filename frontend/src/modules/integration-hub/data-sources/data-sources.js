@@ -600,7 +600,7 @@ export function render(state) {
         <button class="btn" data-wf="ds-refresh">Refresh</button>
       </div>
       ${body}
-    `, `<span class="meta">GraphQL: connectors</span>`)}`;
+    `)}`;
 }
 
 function testResultBadge(result) {
@@ -661,7 +661,7 @@ export function renderDrawer(state) {
     const providerValueForSettings = isCustom ? d.customProvider.trim() : d.provider;
     return drawerShell(
       'New Data Source',
-      'GraphQL: createConnector — real, named fields per provider, not a generic credentials blob',
+      'Real, named fields per provider, not a generic credentials blob.',
       `
       <div class="grid-2">
         <div class="field"><label>Type</label>

@@ -78,7 +78,7 @@ export function render(state) {
         <button class="btn" data-wf="dh-refresh">Refresh</button>
       </div>
       ${body}
-    `, `<span class="meta">REST: /v1/integrations/connectors/:id/historical-imports</span>`)}`;
+    `)}`;
 }
 
 export function renderDrawer(state) {

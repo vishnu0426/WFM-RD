@@ -65,7 +65,7 @@ export function render(state) {
 
 export function renderDrawer(state) {
   if (state.drawer !== "tb") return "";
-  return drawerShell("Add time bank entry", "addTimeBankEntry (GraphQL mutation)",
+  return drawerShell("Add time bank entry", "Manually adjust an employee’s time bank balance.",
     `<div class="grid-2">
        <div class="field"><label>Hours (negative to draw down)</label><input id="tb-hours" type="number" step="0.25" /></div>
        <div class="field"><label>Entry date</label><input id="tb-date" type="date" value="${new Date().toISOString().slice(0, 10)}" /></div>

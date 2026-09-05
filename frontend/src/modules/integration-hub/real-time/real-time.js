@@ -68,7 +68,7 @@ function renderCapabilities(state) {
         </tr>`).join('')}
       </tbody></table>`);
   return `${pageHead('Event Capabilities', 'Real-time ACD relay sessions — start/stop the live event stream per data source.', `<button class="btn" data-wf="rt-refresh">Refresh</button>`)}
-    ${sec('ACD Data Sources', body, `<span class="meta">REST: /v1/integrations/connectors/:id/relay/start|stop</span>`)}`;
+    ${sec('ACD Data Sources', body)}`;
 }
 
 function renderIngestionStatus(state) {

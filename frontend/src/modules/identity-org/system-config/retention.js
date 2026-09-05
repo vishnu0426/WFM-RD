@@ -53,7 +53,7 @@ export function render(state) {
           </tbody></table>`;
   return `
     ${pageHead('Retention', 'Compliance report retention, per jurisdiction (adherence-compliance-service).', `<button class="btn btn-primary" data-wf="sc-retention-open">+ New override</button>`)}
-    ${sec('Retention policies', body, `<span class="meta">GET /v1/compliance/retention-policies</span>`)}`;
+    ${sec('Retention policies', body)}`;
 }
 
 export function renderDrawer(state) {
@@ -63,7 +63,7 @@ export function renderDrawer(state) {
   const saving = state.wf.saving.scRetention;
   return drawerShell(
     editing ? `Override retention — ${esc(editing.jurisdiction)}` : 'New retention override',
-    'PUT /v1/compliance/retention-policies/:jurisdiction',
+    editing ? 'Update this jurisdiction\u2019s retention override.' : 'Add a retention override for a specific jurisdiction.',
     `
     <div class="field"><label>Jurisdiction</label><input data-wf="sc-retention-field" data-id="jurisdiction" placeholder="e.g. US, EU, UK" value="${esc(d.jurisdiction)}" ${editing ? 'disabled' : ''} /></div>
     <div class="field" style="margin-top:10px"><label>Retention (years)</label><input data-wf="sc-retention-field" data-id="retentionYears" type="number" min="1" value="${esc(d.retentionYears)}" /></div>

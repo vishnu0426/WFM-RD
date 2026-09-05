@@ -40,7 +40,6 @@ export function render(state) {
     <div class="toolbar">
       <label class="search"><span>⌕</span><input data-wf="sid-search" value="${esc(state.sidSearch)}" placeholder="Search properties" /></label>
       <button class="btn btn-sm" data-wf="sid-clear">Clear search</button>
-      <span class="meta">PUT /v1/tenant-settings/self-identification</span>
     </div>
     <div class="dual">
       <div class="dual-col">

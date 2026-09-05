@@ -71,7 +71,7 @@ export function render(state) {
         <button class="btn" data-wf="dsr-refresh">Refresh</button>
       </div>
       ${body}
-    `, `<span class="meta">GraphQL: reasonCodes</span>`)}`;
+    `)}`;
 }
 
 export function renderDrawer(state) {
@@ -80,7 +80,7 @@ export function renderDrawer(state) {
   const saving = state.wf.saving.dsrCode;
   return drawerShell(
     state.dsrEditId ? 'Edit Reason Code' : 'Add Reason Code',
-    'GraphQL: upsertReasonCode — also updates this connector\'s FieldMapping so real events translate through it',
+    'Also updates this connector\'s field mapping so real events translate through it.',
     `
     <div class="field"><label>External ID</label><input data-wf="dsr-field" data-id="externalId" placeholder="raw code the ACD emits" value="${esc(d.externalId)}" /></div>
     <div class="field" style="margin-top:10px"><label>Reason Code</label><input data-wf="dsr-field" data-id="reasonCode" value="${esc(d.reasonCode)}" /></div>

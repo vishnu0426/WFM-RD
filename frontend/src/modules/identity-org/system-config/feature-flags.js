@@ -40,7 +40,7 @@ export function render(state) {
           <b>${esc(fs.flagKey)}</b> is currently <b>${fs.enabled ? 'enabled' : 'disabled'}</b> for your tenant.
           <button class="btn btn-primary" data-wf="sc-flag-toggle" data-id="${fs.enabled ? 'false' : 'true'}" ${state.wf.saving.scFlag ? 'disabled' : ''}>${state.wf.saving.scFlag ? 'Saving…' : fs.enabled ? 'Disable' : 'Enable'}</button>
         </div>`}
-    `, `<span class="meta">GraphQL: featureFlag / setFeatureFlag</span>`)}`;
+    `)}`;
 }
 
 export function handle(state, act, id, value) {

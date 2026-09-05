@@ -184,7 +184,7 @@ function empDetail(state) {
       <dt>Start date</dt><dd class="mono">${esc(e.hireDate)}</dd>
       <dt>End date</dt><dd class="mono">${esc(e.terminationDate || "—")}</dd>
       <dt>Employee number</dt><dd class="mono">${esc(e.employeeNumber)}</dd>
-      <dt>Tax ID / SSN</dt><dd>${esc(e.taxIdLastFour ? "••" + e.taxIdLastFour : "—")} <span class="muted">GraphQL last four; full via GET /v1/employees/:id/tax-id</span></dd>
+      <dt>Tax ID / SSN</dt><dd>${esc(e.taxIdLastFour ? "••" + e.taxIdLastFour : "—")} <span class="muted">Only the last four digits are shown here; view the full value separately.</span></dd>
       <dt>Status</dt><dd>${stBadge(e.status)}</dd>
     </dl>
     <div class="actions" style="margin-top:14px">${saveBtn}</div>`);
@@ -263,7 +263,7 @@ export function renderDrawer(state) {
         <div class="field"><label>Last name <span class="req">*</span></label><input id="ce-new-family" /></div>
         <div class="field full"><label>Email <span class="req">*</span></label><input id="ce-new-email" type="email" placeholder="Used for account invite" /></div>
       </div>
-      <p class="hint">Creates the User account via POST /v1/users/invite (same invite flow as the Usernames screen), then links it to this employee — no separate trip needed.</p>` : ""}
+      <p class="hint">Sends the same invite email as the Usernames screen, then links the new account to this employee — no separate trip needed.</p>` : ""}
       ${mode === "none" ? `<p class="hint" style="margin-top:10px">Headcount-only record — no login access, no display name until linked later.</p>` : ""}
       <div class="grid-2" style="margin-top:10px">
         <div class="field"><label>Employee number <span class="req">*</span></label><input id="ce-number" /></div>

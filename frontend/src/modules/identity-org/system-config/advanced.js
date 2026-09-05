@@ -70,7 +70,7 @@ function systemLimitsCard(state) {
       <button class="btn" data-wf="sc-limits-revert" ${dirty ? '' : 'disabled'}>Revert</button>
       <button class="btn btn-primary" data-wf="sc-limits-save" ${dirty && !saving ? '' : 'disabled'}>${saving ? 'Saving…' : 'Save'}</button>
     </div>
-  `, `<span class="meta">POST /v1/policies (policyType=system_limits)</span>`);
+  `);
 }
 
 function maintenanceCard(state) {
@@ -88,7 +88,7 @@ function maintenanceCard(state) {
       <button class="btn" data-wf="sc-maintenance-revert" ${dirty ? '' : 'disabled'}>Revert</button>
       <button class="btn btn-primary" data-wf="sc-maintenance-save" ${dirty && !saving ? '' : 'disabled'}>${saving ? 'Saving…' : 'Save'}</button>
     </div>
-  `, `<span class="meta">POST /v1/policies (policyType=maintenance_mode)</span>`);
+  `);
 }
 
 export function render(state) {

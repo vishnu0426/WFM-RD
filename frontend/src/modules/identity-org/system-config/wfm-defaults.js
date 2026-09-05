@@ -56,7 +56,7 @@ export function render(state) {
         <div class="field"><label>Day boundary</label><input data-wf="sc-wfm-field" data-id="dayBoundary" type="time" value="${esc(d.dayBoundary)}" /></div>
       </div>
       <p class="hint" style="margin-top:10px">Day boundary is the clock time a WFM "day" resets at, for shifts crossing midnight.</p>
-    `, `<span class="meta">GET/PUT /v1/tenant-settings/wfm-defaults</span>`)}
+    `)}
     ${sec('Scheduling / Forecasting / Attendance defaults', `
       <p class="hint" style="margin:0 0 10px"><b>BACKEND GAP:</b> these save real, validated values, but scheduling-service/forecasting-service/attendance-leave-service cannot read this table yet (deliberate per-service schema isolation, no gRPC RPC exposes it to them today) — so changing these numbers does not yet affect scheduling, forecasting, or attendance output. Persisted for when that cross-service wiring exists.</p>
       <div class="grid-2">
@@ -80,7 +80,7 @@ export function render(state) {
         <button class="btn" data-wf="sc-workforce-revert" ${wdDirty ? '' : 'disabled'}>Revert</button>
         <button class="btn btn-primary" data-wf="sc-workforce-save" ${wdDirty && !wdSaving ? '' : 'disabled'}>${wdSaving ? 'Saving…' : 'Save'}</button>
       </div>
-    `, `<span class="meta">GET/PUT /v1/tenant-settings/workforce-defaults</span>`)}`;
+    `)}`;
 }
 
 function selectMinutes(current) {

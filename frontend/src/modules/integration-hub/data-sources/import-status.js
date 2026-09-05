@@ -71,7 +71,7 @@ export function render(state) {
         ${!canSync && selectedConnector ? `<span class="hint">Manual sync only applies to batch connectors (HRIS/Payroll/CRM) — ${esc(selectedConnector.connectorType)} syncs via the real-time relay instead.</span>` : ''}
       </div>
       ${body}
-    `, `<span class="meta">GraphQL: syncJobHistory</span>`)}`;
+    `)}`;
 }
 
 export function handle(state, act, id, value) {

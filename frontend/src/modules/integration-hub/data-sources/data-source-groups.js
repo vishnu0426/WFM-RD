@@ -89,7 +89,7 @@ export function render(state) {
         <button class="btn" data-wf="dsg-refresh">Refresh</button>
       </div>
       ${body}
-    `, `<span class="meta">GraphQL: dataSourceGroups</span>`)}`;
+    `)}`;
 }
 
 export function renderDrawer(state) {
@@ -99,7 +99,7 @@ export function renderDrawer(state) {
     const saving = state.wf.saving.dsgGroup;
     return drawerShell(
       state.dsgEditId ? 'Edit Data Source Group' : 'Create Data Source Group',
-      'GraphQL: upsertDataSourceGroup',
+      state.dsgEditId ? 'Update this group.' : 'Aggregate several external queues under one tenant-facing name.',
       `
       <div class="field"><label>Data Source</label>
         <select data-wf="dsg-field" data-id="dataSourceId">${connectors.map((c) => `<option value="${c.id}" ${d.dataSourceId === c.id ? 'selected' : ''}>${esc(c.provider)} (${esc(c.connectorType)})</option>`).join('')}</select>

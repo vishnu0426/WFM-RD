@@ -66,7 +66,7 @@ export function render(state) {
           </tbody></table>`;
   return `
     ${pageHead('Authentication', 'SAML and OIDC identity providers for single sign-on.', `<button class="btn btn-primary" data-wf="sc-idp-open">+ Add identity provider</button>`)}
-    ${sec('Identity providers', body, `<span class="meta">GET /v1/identity-providers</span>`)}`;
+    ${sec('Identity providers', body)}`;
 }
 
 export function renderDrawer(state) {
@@ -76,7 +76,7 @@ export function renderDrawer(state) {
   const saving = state.wf.saving.scIdp;
   return drawerShell(
     editing ? `Edit ${esc(editing.name)}` : 'Add identity provider',
-    editing ? 'PUT /v1/identity-providers/:id' : 'POST /v1/identity-providers',
+    editing ? "Update this identity provider's configuration." : 'Connect a new SSO identity provider.',
     `
     <div class="field"><label>Name</label><input data-wf="sc-idp-field" data-id="name" value="${esc(d.name)}" /></div>
     <div class="grid-2" style="margin-top:10px">

@@ -260,7 +260,7 @@ export function listScreen() {
                 <p>Custom roles are tenant-scoped. System roles (platform_admin, tenant_admin, employee) appear once seed has run.</p>
                 ${deniedCreate ? "" : `<button class="btn btn-primary" data-act="create">Create Role</button>`}
               </div>`
-            : `<div class="panel-h"><span>Roles</span><span class="meta">GET /v1/roles</span></div>
+            : `<div class="panel-h"><span>Roles</span></div>
         <div style="overflow:auto">
         <table class="data" aria-label="Roles">
           <thead>
@@ -493,7 +493,7 @@ export function permMatrix(selectedSet, { locked = false } = {}) {
 
 export function createPerms() {
     const body = `
-      <p class="hint" style="margin-top:0">Catalog from <span class="mono">GET /v1/permissions</span>.</p>
+      <p class="hint" style="margin-top:0">The full permission catalog for this tenant.</p>
       ${permMatrix(state.wizard.perms)}`;
     return (
       listScreen() +
@@ -554,7 +554,7 @@ export function createReview() {
         <dt>Permissions</dt><dd>${w.perms.size} of ${perms.length}</dd>
         <dt>Default assignment scope</dt><dd>${w.scope === "tenant" ? "Entire organization" : orgName(w.scopeOu) || "Unit not selected"}</dd>
       </dl>
-      <div class="callout" style="margin-top:14px">Create calls <span class="mono">POST /v1/roles</span> with the fields above, then binds each selected permission.</div>`;
+      <div class="callout" style="margin-top:14px">Creates the role with the fields above, then binds each selected permission.</div>`;
     return (
       listScreen() +
       wizardChrome(
@@ -616,7 +616,7 @@ export function detail(tab) {
           </div>
         </div>
         <div class="panel" style="margin-top:14px">
-          <div class="panel-h">Activity <span class="meta">GET /v1/audit-log?resourceType=role&resourceId=…</span></div>
+          <div class="panel-h">Activity</div>
           <div style="padding:14px">
             ${
               act === undefined
@@ -658,7 +658,7 @@ export function detail(tab) {
       header +
       `<div class="toolbar">
         <button class="btn btn-primary" data-act="assign" data-id="${r.id}">+ Assign Users</button>
-        <span class="meta">${r._userCount ?? 0} assigned · GET /v1/roles/{id}/users</span>
+        <span class="meta">${r._userCount ?? 0} assigned</span>
       </div>
       ${
         known === undefined
@@ -763,7 +763,7 @@ export function duplicateModal() {
         <div class="modal" role="dialog" aria-modal="true">
           <div class="modal-h">Duplicate Role</div>
           <div class="modal-b">
-            <p class="hint">Creates a new custom role via POST /v1/roles, then copies permission bindings if selected.</p>
+            <p class="hint">Creates a new custom role, then copies permission bindings if selected.</p>
             <div class="field"><label>New Role Name <span class="req">*</span></label>
               <input id="dup-name" type="text" value="${esc(state.dup.name)}" /></div>
             <div class="field" style="margin-top:10px"><label>Description</label>
@@ -800,7 +800,7 @@ export function editDrawer() {
     return (
       detail("overview") +
       `<div class="drawer-scrim" data-act="close-drawer"><div class="drawer" role="dialog" aria-modal="true">
-        <div class="drawer-h"><div><h2>Edit ${esc(r.name)}</h2><p>PATCH /v1/roles/{id}</p></div>
+        <div class="drawer-h"><div><h2>Edit ${esc(r.name)}</h2><p>Update this role’s name and description.</p></div>
           <button class="icon-btn" data-act="close-drawer">×</button></div>
         <div class="drawer-b">
           <div class="field"><label>Role Name</label><input id="ed-name" value="${esc(e.name ?? r.name)}" /></div>

@@ -58,7 +58,7 @@ export function render(state) {
       </div>
       <p class="hint" style="margin-top:6px">Only <code>skill_expiring</code> has a real producer in this platform today — the key is free text, same as the backend.</p>
     `, '')}
-    ${sec('Channel defaults', body, `<span class="meta">GET/PUT /v1/notification-rules</span>`)}`;
+    ${sec('Channel defaults', body)}`;
 }
 
 export function handle(state, act, id, value) {

@@ -83,7 +83,7 @@ export function render(state) {
         <button class="btn" data-wf="dsa-refresh">Refresh</button>
       </div>
       ${body}
-    `, `<span class="meta">GraphQL: Employee.dataSources (EmployeeDataSource)</span>`)}`;
+    `)}`;
 }
 
 export function renderDrawer(state) {

@@ -81,7 +81,7 @@ export function render(state) {
     ${sec('Integration Servers', `
       <div class="toolbar"><button class="btn" data-wf="is-refresh">Refresh</button></div>
       ${body}
-    `, `<span class="meta">GraphQL: integrationServers</span>`)}`;
+    `)}`;
 }
 
 export function renderDrawer(state) {
@@ -90,7 +90,7 @@ export function renderDrawer(state) {
   const saving = state.wf.saving.isServer;
   return drawerShell(
     state.isEditId ? 'Edit Integration Server' : 'Register Integration Server',
-    'GraphQL: upsertIntegrationServer — real field names from Verint WFO/EMT\'s own "Create Server" admin screen',
+    'Real field names from Verint WFO/EMT\'s own "Create Server" admin screen.',
     `
     <div class="grid-2">
       <div class="field"><label>Name</label><input data-wf="is-field" data-id="name" value="${esc(d.name)}" /></div>

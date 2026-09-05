@@ -51,7 +51,7 @@ export function render(state) {
       </div>
       <div class="field" style="margin-top:10px"><label>From address</label><input data-wf="sc-email-field" data-id="smtpFromAddress" placeholder="noreply@example.com" value="${esc(d.smtpFromAddress)}" /></div>
       <div class="field" style="margin-top:10px"><label><input type="checkbox" data-wf="sc-email-tls" ${d.smtpUseTls ? 'checked' : ''} /> Use TLS</label></div>
-    `, `<span class="meta">PUT /v1/tenant-settings/email</span>`)}`;
+    `)}`;
 }
 
 export function handle(state, act, id, value) {

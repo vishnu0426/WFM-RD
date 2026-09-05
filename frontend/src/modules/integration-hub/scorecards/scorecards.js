@@ -38,7 +38,7 @@ function renderSystems(state) {
           <td class="row-actions"><button class="btn btn-sm" data-wf="sco-sys-edit" data-id="${s.id}">Edit</button><button class="btn btn-sm btn-danger" data-wf="sco-sys-delete" data-id="${s.id}">Delete</button></td></tr>`).join('')}
       </tbody></table>`;
   return `${pageHead('Source Systems', 'External scorecard/QM systems registered for this tenant.', `<button class="btn btn-primary" data-wf="sco-sys-open">+ New Source System</button>`)}
-    ${sec('Source Systems', body, `<span class="meta">GraphQL: scorecardSourceSystems</span>`)}`;
+    ${sec('Source Systems', body)}`;
 }
 
 /* ---------- Source Measures ---------- */
@@ -69,7 +69,7 @@ function renderMeasures(state) {
           <td class="row-actions"><button class="btn btn-sm" data-wf="sco-mea-edit" data-id="${m.id}">Edit</button><button class="btn btn-sm btn-danger" data-wf="sco-mea-delete" data-id="${m.id}">Delete</button></td></tr>`).join('')}
       </tbody></table>`;
   return `${pageHead('Source Measures', 'Metrics an external scorecard source exposes.', `<button class="btn btn-primary" data-wf="sco-mea-open" ${state.scoMeasuresSystemId ? '' : 'disabled'}>+ New Measure</button>`)}
-    ${sec('Measures', `<div class="toolbar">${systemSelect(systems, state.scoMeasuresSystemId, 'sco-mea-select-system')}<button class="btn" data-wf="sco-mea-refresh">Refresh</button></div>${body}`, `<span class="meta">GraphQL: scorecardSourceMeasures</span>`)}`;
+    ${sec('Measures', `<div class="toolbar">${systemSelect(systems, state.scoMeasuresSystemId, 'sco-mea-select-system')}<button class="btn" data-wf="sco-mea-refresh">Refresh</button></div>${body}`)}`;
 }
 
 /* ---------- Source Codes ---------- */
@@ -100,7 +100,7 @@ function renderCodes(state) {
           <td class="row-actions"><button class="btn btn-sm" data-wf="sco-cod-edit" data-id="${c.id}">Edit</button><button class="btn btn-sm btn-danger" data-wf="sco-cod-delete" data-id="${c.id}">Delete</button></td></tr>`).join('')}
       </tbody></table>`;
   return `${pageHead('Source Codes', 'Raw code catalog an external scorecard source emits.', `<button class="btn btn-primary" data-wf="sco-cod-open" ${state.scoCodesSystemId ? '' : 'disabled'}>+ New Code</button>`)}
-    ${sec('Source Codes', `<div class="toolbar">${systemSelect(systems, state.scoCodesSystemId, 'sco-cod-select-system')}<button class="btn" data-wf="sco-cod-refresh">Refresh</button></div>${body}`, `<span class="meta">GraphQL: scorecardSourceCodes</span>`)}`;
+    ${sec('Source Codes', `<div class="toolbar">${systemSelect(systems, state.scoCodesSystemId, 'sco-cod-select-system')}<button class="btn" data-wf="sco-cod-refresh">Refresh</button></div>${body}`)}`;
 }
 
 /* ---------- Source Mappings ---------- */
@@ -139,7 +139,7 @@ function renderMappings(state) {
           <td class="row-actions"><button class="btn btn-sm" data-wf="sco-map-edit" data-id="${m.id}">Edit</button><button class="btn btn-sm btn-danger" data-wf="sco-map-delete" data-id="${m.id}">Delete</button></td></tr>`).join('')}
       </tbody></table>`;
   return `${pageHead('Source Mappings', 'Maps a Source Measure onto a WFM-facing metric label (tenant-authored — no canonical KPI catalog exists to map onto).', `<button class="btn btn-primary" data-wf="sco-map-open" ${state.scoMapMeasureId ? '' : 'disabled'}>+ New Mapping</button>`)}
-    ${sec('Source Mappings', `<div class="toolbar">${systemSelect(systems, state.scoMapSystemId, 'sco-map-select-system')}${measureSelect(measures, state.scoMapMeasureId)}<button class="btn" data-wf="sco-map-refresh">Refresh</button></div>${body}`, `<span class="meta">GraphQL: scorecardSourceMappings</span>`)}`;
+    ${sec('Source Mappings', `<div class="toolbar">${systemSelect(systems, state.scoMapSystemId, 'sco-map-select-system')}${measureSelect(measures, state.scoMapMeasureId)}<button class="btn" data-wf="sco-map-refresh">Refresh</button></div>${body}`)}`;
 }
 
 /* ---------- Dimension Types ---------- */
@@ -168,7 +168,7 @@ function renderDimTypes(state) {
           <td class="row-actions"><button class="btn btn-sm" data-wf="sco-dt-edit" data-id="${d.id}">Edit</button><button class="btn btn-sm btn-danger" data-wf="sco-dt-delete" data-id="${d.id}">Delete</button></td></tr>`).join('')}
       </tbody></table>`;
   return `${pageHead('Dimension Types', 'Tenant-defined scorecard dimension categories.', `<button class="btn btn-primary" data-wf="sco-dt-open">+ New Dimension Type</button>`)}
-    ${sec('Dimension Types', body, `<span class="meta">GraphQL: scorecardDimensionTypes</span>`)}`;
+    ${sec('Dimension Types', body)}`;
 }
 
 /* ---------- Dimension Members ---------- */
@@ -199,7 +199,7 @@ function renderDimMembers(state) {
           <td class="row-actions"><button class="btn btn-sm" data-wf="sco-dm-edit" data-id="${m.id}">Edit</button><button class="btn btn-sm btn-danger" data-wf="sco-dm-delete" data-id="${m.id}">Delete</button></td></tr>`).join('')}
       </tbody></table>`;
   return `${pageHead('Dimension Members', 'Members/values under a dimension type.', `<button class="btn btn-primary" data-wf="sco-dm-open" ${state.scoDimMembersTypeId ? '' : 'disabled'}>+ New Member</button>`)}
-    ${sec('Dimension Members', `<div class="toolbar">${dimTypeSelect(types, state.scoDimMembersTypeId)}<button class="btn" data-wf="sco-dm-refresh">Refresh</button></div>${body}`, `<span class="meta">GraphQL: scorecardDimensionMembers</span>`)}`;
+    ${sec('Dimension Members', `<div class="toolbar">${dimTypeSelect(types, state.scoDimMembersTypeId)}<button class="btn" data-wf="sco-dm-refresh">Refresh</button></div>${body}`)}`;
 }
 
 /* ---------- F&S Queue Mappings (reuses forecasting-service Campaign/CampaignQueue) ---------- */
@@ -254,7 +254,7 @@ function renderFsQueueMappings(state) {
         <button class="btn" data-wf="sco-fs-refresh">Refresh</button>
       </div>
       ${body}
-    `, `<span class="meta">REST: /v1/forecasting/campaigns/:id/queues</span>`)}`;
+    `)}`;
 }
 
 /* ---------- shared bits ---------- */
@@ -287,14 +287,14 @@ export function render(state) {
 export function renderDrawer(state) {
   if (state.drawer === 'sco-sys-edit') {
     const d = state.scoSysDraft;
-    return drawerShell(state.scoSysEditId ? 'Edit Source System' : 'New Source System', 'GraphQL: upsertScorecardSourceSystem', `
+    return drawerShell(state.scoSysEditId ? 'Edit Source System' : 'New Source System', state.scoSysEditId ? 'Update this source system.' : 'Register a new scorecard source system.', `
       <div class="field"><label>Name</label><input data-wf="sco-sys-field" data-id="name" value="${esc(d.name)}" /></div>
       <div class="field" style="margin-top:10px"><label>Provider</label><input data-wf="sco-sys-field" data-id="provider" value="${esc(d.provider)}" /></div>
     `, `<button class="btn" data-wf="close-drawer">Cancel</button>`, `<button class="btn btn-primary" data-wf="sco-sys-save">Save</button>`);
   }
   if (state.drawer === 'sco-mea-edit') {
     const d = state.scoMeaDraft;
-    return drawerShell(state.scoMeaEditId ? 'Edit Measure' : 'New Measure', 'GraphQL: upsertScorecardSourceMeasure', `
+    return drawerShell(state.scoMeaEditId ? 'Edit Measure' : 'New Measure', state.scoMeaEditId ? 'Update this measure.' : 'Define a new measure for this source system.', `
       <div class="field"><label>Code</label><input data-wf="sco-mea-field" data-id="code" value="${esc(d.code)}" /></div>
       <div class="field" style="margin-top:10px"><label>Name</label><input data-wf="sco-mea-field" data-id="name" value="${esc(d.name)}" /></div>
       <div class="field" style="margin-top:10px"><label>Unit</label><input data-wf="sco-mea-field" data-id="unit" value="${esc(d.unit)}" /></div>
@@ -303,28 +303,28 @@ export function renderDrawer(state) {
   }
   if (state.drawer === 'sco-cod-edit') {
     const d = state.scoCodDraft;
-    return drawerShell(state.scoCodEditId ? 'Edit Code' : 'New Code', 'GraphQL: upsertScorecardSourceCode', `
+    return drawerShell(state.scoCodEditId ? 'Edit Code' : 'New Code', state.scoCodEditId ? 'Update this code.' : 'Define a new source code.', `
       <div class="field"><label>Code</label><input data-wf="sco-cod-field" data-id="code" value="${esc(d.code)}" /></div>
       <div class="field" style="margin-top:10px"><label>Description</label><input data-wf="sco-cod-field" data-id="description" value="${esc(d.description)}" /></div>
     `, `<button class="btn" data-wf="close-drawer">Cancel</button>`, `<button class="btn btn-primary" data-wf="sco-cod-save">Save</button>`);
   }
   if (state.drawer === 'sco-map-edit') {
     const d = state.scoMapDraft;
-    return drawerShell(state.scoMapEditId ? 'Edit Mapping' : 'New Mapping', 'GraphQL: upsertScorecardSourceMapping', `
+    return drawerShell(state.scoMapEditId ? 'Edit Mapping' : 'New Mapping', state.scoMapEditId ? 'Update this mapping.' : 'Map a source code to a measure.', `
       <div class="field"><label>Target Metric</label><input data-wf="sco-map-field" data-id="targetMetric" value="${esc(d.targetMetric)}" /></div>
       <div class="field" style="margin-top:10px"><label>Description</label><input data-wf="sco-map-field" data-id="description" value="${esc(d.description)}" /></div>
     `, `<button class="btn" data-wf="close-drawer">Cancel</button>`, `<button class="btn btn-primary" data-wf="sco-map-save">Save</button>`);
   }
   if (state.drawer === 'sco-dt-edit') {
     const d = state.scoDtDraft;
-    return drawerShell(state.scoDtEditId ? 'Edit Dimension Type' : 'New Dimension Type', 'GraphQL: upsertScorecardDimensionType', `
+    return drawerShell(state.scoDtEditId ? 'Edit Dimension Type' : 'New Dimension Type', state.scoDtEditId ? 'Update this dimension type.' : 'Define a new dimension type.', `
       <div class="field"><label>Name</label><input data-wf="sco-dt-field" data-id="name" value="${esc(d.name)}" /></div>
       <div class="field" style="margin-top:10px"><label>Description</label><input data-wf="sco-dt-field" data-id="description" value="${esc(d.description)}" /></div>
     `, `<button class="btn" data-wf="close-drawer">Cancel</button>`, `<button class="btn btn-primary" data-wf="sco-dt-save">Save</button>`);
   }
   if (state.drawer === 'sco-dm-edit') {
     const d = state.scoDmDraft;
-    return drawerShell(state.scoDmEditId ? 'Edit Member' : 'New Member', 'GraphQL: upsertScorecardDimensionMember', `
+    return drawerShell(state.scoDmEditId ? 'Edit Member' : 'New Member', state.scoDmEditId ? 'Update this member.' : 'Add a new member to this dimension type.', `
       <div class="field"><label>Code</label><input data-wf="sco-dm-field" data-id="code" value="${esc(d.code)}" /></div>
       <div class="field" style="margin-top:10px"><label>Name</label><input data-wf="sco-dm-field" data-id="name" value="${esc(d.name)}" /></div>
     `, `<button class="btn" data-wf="close-drawer">Cancel</button>`, `<button class="btn btn-primary" data-wf="sco-dm-save">Save</button>`);

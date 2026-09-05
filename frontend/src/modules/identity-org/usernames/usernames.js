@@ -11,7 +11,7 @@ import { loadUsers, loadCredStatus } from '../shared/loaders.js';
 export function renderDrawer(state) {
   const d = state.drawer;
   if (d === "invite") {
-    return drawerShell("Invite user", "POST /v1/users/invite { email, givenName?, familyName? }",
+    return drawerShell("Invite user", "Send an email invite to create their account.",
       `<div class="field"><label>Email <span class="req">*</span></label><input type="email" id="invite-email" /></div>
        <div class="grid-2" style="margin-top:10px">
          <div class="field"><label>First name</label><input id="invite-given" /></div>
@@ -22,7 +22,7 @@ export function renderDrawer(state) {
   }
   if (d === "set-username") {
     const u = (state.wf.users || []).find((x) => x.id === state.usernameTarget);
-    return drawerShell("Set username", "PATCH /v1/users/:id/username",
+    return drawerShell("Set username", "Change the username used to sign in.",
       `<div class="field"><label>Username</label><input id="username-input" value="${esc((u && u.username) || "")}" /></div>`,
       `<button class="btn" data-wf="close-drawer">Cancel</button>`,
       `<button class="btn btn-primary" data-wf="username-go" ${state.wf.saving.username ? "disabled" : ""}>${state.wf.saving.username ? "Saving…" : "Save"}</button>`);
@@ -52,7 +52,7 @@ export function render(state) {
     <div class="toolbar">
       <label class="search"><span>⌕</span><input data-wf="user-search" value="${esc(state.userSearch)}" placeholder="Name, email, username" /></label>
       <select data-wf="user-st"><option value="">Any status</option>${["ACTIVE", "INVITED", "DISABLED"].map((s) => `<option ${state.userFilter.status === s ? "selected" : ""}>${s}</option>`).join("")}</select>
-      <span class="meta">${rows.length} users · GraphQL users</span>
+      <span class="meta">${rows.length} users</span>
     </div>
     <div class="split">
       <div class="split-l">
@@ -86,7 +86,7 @@ export function render(state) {
             <dt>Failed attempts</dt><dd>${cred.failedLoginAttempts}</dd>
             <dt>Password updated</dt><dd class="mono">${fmtDt(cred.passwordUpdatedAt)}</dd>
           </dl>`)}
-          ${sec("Set password", `<p class="hint">PUT /v1/users/:id/credential · min 12 characters. Value is write-only.</p>
+          ${sec("Set password", `<p class="hint">Minimum 12 characters. The value is write-only — it is never shown again after saving.</p>
             <div class="field"><label>New password</label><input type="password" id="pw-input-${u.id}" placeholder="••••••••••••" autocomplete="new-password" /></div>
             <button class="btn" style="margin-top:8px" data-wf="set-password" data-id="${u.id}" ${state.wf.saving.pw ? "disabled" : ""}>${state.wf.saving.pw ? "Saving…" : "Save password"}</button>`)}
           ${sec("Reset / unlock / invite", `

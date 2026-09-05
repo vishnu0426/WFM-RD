@@ -50,7 +50,7 @@ export function render(state) {
           }).join('');
   return `
     ${pageHead('Integration Health', 'Real connection, sync, and streaming status per data source.', `<button class="btn" data-wf="dhh-refresh">Refresh</button>`)}
-    ${sec('Data Sources', body, `<span class="meta">GraphQL: connectorsHealth</span>`)}`;
+    ${sec('Data Sources', body)}`;
 }
 
 export function handle(state, act) {

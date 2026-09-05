@@ -115,7 +115,7 @@ export function renderDrawer(state) {
     const draftEntries = state.spDraftEntries || (editing ? editing.entries.map((e) => ({ ...e })) : []);
     state.spDraftEntries = draftEntries;
     if (state.spDraftName === undefined) state.spDraftName = (editing && editing.name) || "";
-    return drawerShell(editing ? "Edit staffing profile" : "Create staffing profile", editing ? "PATCH /v1/scheduling/staffing-profiles/:id" : "POST /v1/scheduling/staffing-profiles",
+    return drawerShell(editing ? "Edit staffing profile" : "Create staffing profile", editing ? "Update this staffing profile." : "Define a new staffing profile.",
       `<div class="field"><label>Name</label><input id="sp-name" data-wf="sp-name-input" value="${esc(state.spDraftName)}" placeholder="e.g. Standard weekday" /></div>
        <div class="field" style="margin-top:10px"><label>Entries</label>
          ${draftEntries.map((e, i) => `<div class="cov" style="margin-bottom:6px">
@@ -131,7 +131,7 @@ export function renderDrawer(state) {
   }
   if (d === "template") {
     const editing = state.editTemplateTarget;
-    return drawerShell(editing ? "Edit shift template" : "Create shift template", editing ? "PATCH /v1/scheduling/shift-templates/:id" : "POST /v1/scheduling/shift-templates",
+    return drawerShell(editing ? "Edit shift template" : "Create shift template", editing ? "Update this shift template." : "Define a new shift template.",
       `<div class="grid-2">
         <div class="field full"><label>Name</label><input id="st-name" value="${esc((editing && editing.name) || "")}" /></div>
         <div class="field"><label>Start time</label><input id="st-start" type="time" value="${(editing && editing.startTime) || "09:00"}" /></div>
@@ -147,7 +147,7 @@ export function renderDrawer(state) {
     const dayValues = state.patternDayValues || Array(dayCount).fill("");
     state.patternDayValues = dayValues;
     if (state.patternDraftName === undefined) state.patternDraftName = "";
-    return drawerShell("Create work pattern", "POST /v1/scheduling/work-patterns — one shift template (or day off) per day",
+    return drawerShell("Create work pattern", "Assign one shift template (or a day off) to each day of the pattern.",
       `<div class="field"><label>Name</label><input id="wp-name" data-wf="wp-name-input" value="${esc(state.patternDraftName)}" /></div>
        <div class="field" style="margin-top:10px"><label>Days (${dayCount})</label>
          ${dayValues.map((v, i) => `<div style="margin-bottom:6px"><span class="muted" style="display:inline-block;width:60px">Day ${i + 1}</span><select data-wf="wp-day-select" data-id="${i}"><option value="">Off</option>${templates.map((t) => `<option value="${t.id}" ${v === t.id ? "selected" : ""}>${esc(t.name)}</option>`).join("")}</select></div>`).join("")}

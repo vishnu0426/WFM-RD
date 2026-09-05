@@ -87,7 +87,7 @@ export function render(state) {
       <div class="toolbar">
         <select data-wf="leave-org">${state.data.orgUnits.map((o) => `<option value="${o.id}" ${state.leaveOrgUnit === o.id ? "selected" : ""}>${"— ".repeat(o.depth)}${esc(o.name)}</option>`).join("")}</select>
         <select data-wf="leave-status">${["pending", "approved", "rejected"].map((s) => `<option value="${s}" ${state.leaveStatusFilter === s ? "selected" : ""}>${s[0].toUpperCase() + s.slice(1)}</option>`).join("")}</select>
-        <span class="meta">GET /v1/leave/requests?orgUnitId=…&status=… — no tenant-wide list endpoint</span>
+        <span class="meta">Filtered by org unit and status — there is no combined list across all org units.</span>
       </div>
       ${requests === undefined ? `<div class="panel"><div style="padding:16px"><div class="skel" style="height:24px"></div></div></div>`
         : requests.error ? `<div class="panel"><div class="empty"><h2>Failed to load requests</h2><p>${esc(requests.error)}</p></div></div>`
@@ -112,7 +112,7 @@ export function render(state) {
     body = (!typesLoaded
       ? (state.wf.leaveTypes && state.wf.leaveTypes.error ? `<div class="panel"><div class="empty"><h2>Failed to load leave types</h2><p>${esc(state.wf.leaveTypes.error)}</p></div></div>` : `<div class="panel"><div style="padding:16px"><div class="skel" style="height:24px"></div></div></div>`)
       : `<table class="data"><thead><tr><th>Name</th><th>Accrual policy</th><th>Approval</th><th>Documentation</th><th>Max consecutive</th><th></th></tr></thead><tbody>${types.map((t) => `<tr><td>${esc(t.name)}</td><td class="mono">${esc(policyName(t.accrualPolicyId))}</td><td>${t.requiresApproval ? "Yes" : "No"}</td><td>${t.requiresDocumentation ? "Yes" : "No"}</td><td>${t.maxConsecutiveDays ?? "—"}</td><td><button class="btn btn-sm" data-wf="edit-leave-type" data-id="${t.id}">Edit</button> <button class="btn btn-sm" data-wf="delete-leave-type" data-id="${t.id}">Delete</button></td></tr>`).join("") || `<tr><td colspan="6" class="muted">No leave types yet.</td></tr>`}</tbody></table>`)
-      + `<div class="panel" style="margin-top:14px"><div class="panel-h"><span>Accrual policies</span><span class="meta">GET/POST/PATCH/DELETE /v1/accrual-policies<button class="btn btn-sm" style="margin-left:12px" data-wf="open-accrual-policy">+ New policy</button></span></div>
+      + `<div class="panel" style="margin-top:14px"><div class="panel-h"><span>Accrual policies</span><span class="meta"><button class="btn btn-sm" style="margin-left:12px" data-wf="open-accrual-policy">+ New policy</button></span></div>
         ${!Array.isArray(state.wf.accrualPolicies)
           ? (state.wf.accrualPolicies && state.wf.accrualPolicies.error ? `<p class="muted" style="padding:14px">${esc(state.wf.accrualPolicies.error)}</p>` : `<div style="padding:16px"><div class="skel" style="height:16px"></div></div>`)
           : `<table class="data"><thead><tr><th>Name</th><th>Rate / period</th><th>Frequency</th><th>Cap</th><th>Status</th><th></th></tr></thead><tbody>${policies.map((p) => `<tr><td>${esc(p.name)}</td><td class="mono">${p.accrualRatePerPeriod}</td><td>${p.accrualFrequency}</td><td class="mono">${p.maxBalanceCap ?? "—"}</td><td>${stBadge(p.status)}</td><td><button class="btn btn-sm" data-wf="delete-accrual-policy" data-id="${p.id}">Delete</button></td></tr>`).join("") || `<tr><td colspan="6" class="muted">No accrual policies yet — create one, then reference it when creating a leave type.</td></tr>`}</tbody></table>`}
@@ -159,7 +159,7 @@ export function renderDrawer(state) {
     if (state.lrDraft.leaveTypeId === undefined) state.lrDraft.leaveTypeId = types[0]?.id || "";
     if (state.lrDraft.dateRangeStart === undefined) state.lrDraft.dateRangeStart = "";
     if (state.lrDraft.dateRangeEnd === undefined) state.lrDraft.dateRangeEnd = "";
-    return drawerShell("Create leave request", "POST /v1/leave/requests",
+    return drawerShell("Create leave request", "Request time off for an employee.",
       `<div class="field"><label>Employee</label><select id="lr-emp" data-wf="lr-emp-input">${employees.map((e) => `<option value="${e.id}" ${e.id === state.lrDraft.employeeId ? "selected" : ""}>${esc(empLabel(state, e))}</option>`).join("")}</select></div>
        <div class="field" style="margin-top:10px"><label>Leave type</label><select id="lr-type" data-wf="lr-type-input">${types.map((t) => `<option value="${t.id}" ${t.id === state.lrDraft.leaveTypeId ? "selected" : ""}>${esc(t.name)}</option>`).join("")}</select></div>
        <div class="grid-2" style="margin-top:10px">
@@ -170,7 +170,7 @@ export function renderDrawer(state) {
       `<button class="btn btn-primary" data-wf="leave-request-go" ${state.wf.saving.leave ? "disabled" : ""}>${state.wf.saving.leave ? "Submitting…" : "Submit"}</button>`);
   }
   if (d === "reject-leave") {
-    return drawerShell("Reject request", "POST /v1/leave/requests/:id/decision — a reason is required to reject.",
+    return drawerShell("Reject request", "A reason is required to reject this request.",
       `<div class="field"><label>Reason</label><textarea id="lr-reject-reason"></textarea></div>`,
       `<button class="btn" data-wf="close-drawer">Cancel</button>`,
       `<button class="btn btn-primary" data-wf="reject-leave-go" data-id="${state.rejectLeaveTarget || ""}" ${state.wf.saving.leave ? "disabled" : ""}>${state.wf.saving.leave ? "Rejecting…" : "Reject"}</button>`);
@@ -184,7 +184,7 @@ export function renderDrawer(state) {
     if (state.ltDraft.maxConsecutiveDays === undefined) state.ltDraft.maxConsecutiveDays = (editing && editing.maxConsecutiveDays) || "";
     if (state.ltDraft.requiresApproval === undefined) state.ltDraft.requiresApproval = !editing || editing.requiresApproval;
     if (state.ltDraft.requiresDocumentation === undefined) state.ltDraft.requiresDocumentation = !!(editing && editing.requiresDocumentation);
-    return drawerShell(editing ? "Edit leave type" : "Create leave type", editing ? "PATCH /v1/leave-types/:id" : "POST /v1/leave-types",
+    return drawerShell(editing ? "Edit leave type" : "Create leave type", editing ? "Update this leave type." : "Define a new leave type.",
       `<div class="field"><label>Name</label><input id="lt-name" data-wf="lt-name-input" value="${esc(state.ltDraft.name)}" /></div>
        <div class="field" style="margin-top:10px"><label>Accrual policy</label>
          ${editing
@@ -200,7 +200,7 @@ export function renderDrawer(state) {
       `<button class="btn btn-primary" data-wf="${editing ? "leave-type-edit-go" : "leave-type-go"}" ${editing ? `data-id="${editing.id}"` : ""} ${state.wf.saving.leaveType ? "disabled" : ""}>${state.wf.saving.leaveType ? "Saving…" : editing ? "Save" : "Create"}</button>`);
   }
   if (d === "accrual-policy") {
-    return drawerShell("New accrual policy", "POST /v1/accrual-policies",
+    return drawerShell("New accrual policy", "Define a new accrual policy.",
       `<div class="field"><label>Name</label><input id="ap-name" placeholder="e.g. Standard PTO accrual" /></div>
        <div class="grid-2" style="margin-top:10px">
          <div class="field"><label>Rate per period</label><input id="ap-rate" type="number" min="0" step="0.25" value="1" /></div>
@@ -224,7 +224,7 @@ export function renderDrawer(state) {
     if (state.pbDraft.periodEnd === undefined) state.pbDraft.periodEnd = "";
     if (state.pbDraft.accruedDays === undefined) state.pbDraft.accruedDays = "";
     if (state.pbDraft.carryoverDaysIn === undefined) state.pbDraft.carryoverDaysIn = "";
-    return drawerShell("Provision leave balance", "POST /v1/leave/employees/:employeeId/balances — admin-only, leave_balance:write",
+    return drawerShell("Provision leave balance", "Provision a leave balance directly for this employee.",
       `<p class="hint">For ${esc(empLabel(state, empById(state, state.leaveBalanceEmp)))}. There is no accrual engine in this backend — this creates one balance period directly; it does not recur.</p>
        <div class="field" style="margin-top:10px"><label>Leave type</label><select id="pb-type" data-wf="pb-type-input">${types.map((t) => `<option value="${t.id}" ${t.id === state.pbDraft.leaveTypeId ? "selected" : ""}>${esc(t.name)}</option>`).join("")}</select></div>
        <div class="grid-2" style="margin-top:10px">
