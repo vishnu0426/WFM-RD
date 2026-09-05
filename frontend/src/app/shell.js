@@ -883,6 +883,25 @@ setRerender(() => render());
   app.addEventListener("change", (e) => {
     const t = e.target;
     if (t.dataset.wf) {
+      // A file input's `.value` is a fake path string ("C:\fakepath\x.pem"),
+      // never the file's actual bytes - reading it is inherently async
+      // (FileReader), unlike every other field type this listener handles
+      // synchronously below. Certificates/private keys/NKey seeds/creds
+      // files are all real text formats, so readAsText is always correct
+      // here - this app has no field that uploads a binary certificate.
+      if (t.type === "file") {
+        const file = t.files && t.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          if (activeModule().mod.handle(state, t.dataset.wf, t.dataset.id, reader.result)) {
+            setTimeout(render, 0);
+          }
+        };
+        reader.onerror = () => toast(`Could not read file "${file.name}".`);
+        reader.readAsText(file);
+        return;
+      }
       // A checkbox's `.value` is the static HTML value attribute (always
       // "on" unless overridden) regardless of checked state - `.checked` is
       // the actual signal. Every handler that keys off this event's value

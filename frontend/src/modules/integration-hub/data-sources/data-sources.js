@@ -615,8 +615,8 @@ function natsAuthFieldsHtml(d) {
         <div class="field"><label>Username</label><input data-wf="ds-connector-field" data-id="natsUser" value="${esc(d.natsUser)}" /></div>
         <div class="field"><label>Password</label><input data-wf="ds-connector-field" data-id="natsPass" type="password" value="${esc(d.natsPass)}" /></div>
       </div>`,
-    nkey: `<div class="field" style="margin-top:10px"><label>NKey Seed</label><textarea data-wf="ds-connector-field" data-id="natsNkeySeed" rows="2" class="mono" placeholder="SU...">${esc(d.natsNkeySeed)}</textarea></div>`,
-    creds: `<div class="field" style="margin-top:10px"><label>Credentials File (.creds contents)</label><textarea data-wf="ds-connector-field" data-id="natsCredsFile" rows="5" class="mono" placeholder="-----BEGIN NATS USER JWT-----...">${esc(d.natsCredsFile)}</textarea></div>`,
+    nkey: `<div class="field" style="margin-top:10px"><label>NKey Seed</label>${fileUploadHtml('ds-connector-field', 'natsNkeySeed', '.nk,.seed,.txt')}<textarea data-wf="ds-connector-field" data-id="natsNkeySeed" rows="2" class="mono" placeholder="SU...">${esc(d.natsNkeySeed)}</textarea></div>`,
+    creds: `<div class="field" style="margin-top:10px"><label>Credentials File (.creds contents)</label>${fileUploadHtml('ds-connector-field', 'natsCredsFile', '.creds,.txt')}<textarea data-wf="ds-connector-field" data-id="natsCredsFile" rows="5" class="mono" placeholder="-----BEGIN NATS USER JWT-----...">${esc(d.natsCredsFile)}</textarea></div>`,
   };
   return `
     <div class="field" style="margin-top:10px"><label>NATS Authentication Type</label>
@@ -625,8 +625,20 @@ function natsAuthFieldsHtml(d) {
     </div>
     ${perType[d.natsAuthType] || ''}
     <div class="field" style="margin-top:10px"><label>TLS CA Certificate (optional — for a self-signed on-prem server)</label>
+      ${fileUploadHtml('ds-connector-field', 'natsTlsCaCert', '.pem,.crt,.cer,.txt')}
       <textarea data-wf="ds-connector-field" data-id="natsTlsCaCert" rows="4" class="mono" placeholder="-----BEGIN CERTIFICATE-----...">${esc(d.natsTlsCaCert)}</textarea>
     </div>`;
+}
+
+/* A certificate/private key/NKey seed/creds file is real text a tenant
+   admin almost always already has as a file on disk, not something
+   they'd naturally retype - shown above the textarea it fills (never
+   replacing it), since the file's contents still need to be visible/
+   editable and still travel through this app's one real "change" pipe
+   (app/shell.js's own FileReader branch - a file input's own `.value` is
+   just a fake path, never the bytes). */
+function fileUploadHtml(action, fieldId, accept) {
+  return `<input type="file" data-wf="${action}" data-id="${fieldId}" ${accept ? `accept="${accept}"` : ''} style="margin-bottom:6px;display:block" />`;
 }
 
 function catalogFieldsHtml(fields, values, action) {
@@ -634,7 +646,7 @@ function catalogFieldsHtml(fields, values, action) {
     <div class="field" style="margin-top:10px">
       <label>${esc(f.label)}</label>
       ${f.type === 'textarea'
-        ? `<textarea data-wf="${action}" data-id="${f.id}" rows="3" class="mono">${esc(values[f.id] || '')}</textarea>`
+        ? `${fileUploadHtml(action, f.id, '.pem,.crt,.cer,.key,.txt')}<textarea data-wf="${action}" data-id="${f.id}" rows="3" class="mono">${esc(values[f.id] || '')}</textarea>`
         : `<input type="${f.type === 'number' ? 'number' : f.type === 'password' ? 'password' : 'text'}" data-wf="${action}" data-id="${f.id}" value="${esc(values[f.id] || '')}" />`}
     </div>`).join('');
 }
