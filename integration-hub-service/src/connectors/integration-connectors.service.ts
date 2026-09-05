@@ -57,6 +57,8 @@ export interface CreateConnectorInput {
    * smuggle a raw credential past the guard).
    */
   additionalConfig?: Record<string, unknown>;
+  /** Same validated `config.settings` shape `updateSettings` accepts (WFM/Timezone/Scorecards/Recorder/etc.) - lets a tenant admin configure everything in one create step instead of a required follow-up edit. Validated the same way, same non-credential guarantee. */
+  settings?: Record<string, unknown>;
 }
 
 export interface CreateConnectorResult {
@@ -126,7 +128,8 @@ export class IntegrationConnectorsService {
     } = input.oauth
       ? await this.prepareOAuthConnector(tenantId, connectorId, input.oauth)
       : await this.prepareDirectCredentialConnector(tenantId, connectorId, input.credentials!);
-    const config = { ...baseConfig, ...(input.additionalConfig ?? {}) };
+    const settings = input.settings ? validateConnectorSettings(input.settings) : undefined;
+    const config = { ...baseConfig, ...(input.additionalConfig ?? {}), ...(settings ? { settings } : {}) };
 
     assertNoRawCredentialMaterial(config);
 

@@ -149,7 +149,7 @@ scalar JSON
 type Mutation {
   addDataSourceGroupQueue(ccQueueId: ID!, groupId: ID!): DataSourceGroupQueue!
   associateIntegrationServer(connectorId: ID!, serverId: ID!): IntegrationConnectorServer!
-  createConnector(additionalConfig: JSON, connectorType: ConnectorType!, credentials: JSON, oauthAuthorizationEndpoint: String, oauthClientId: String, oauthClientSecret: String, oauthRedirectUri: String, oauthScope: String, oauthTokenEndpoint: String, provider: String!): CreateConnectorResult!
+  createConnector(additionalConfig: JSON, connectorType: ConnectorType!, credentials: JSON, oauthAuthorizationEndpoint: String, oauthClientId: String, oauthClientSecret: String, oauthRedirectUri: String, oauthScope: String, oauthTokenEndpoint: String, provider: String!, settings: JSON): CreateConnectorResult!
   createFieldAuthorityPolicy(authoritativeSource: FieldAuthoritySource!, conflictAction: FieldConflictAction!, connectorId: String!, fieldName: String!): FieldAuthorityPolicy!
   createWebhookSubscription(eventTypes: [String!]!, targetUrl: String!): CreateWebhookSubscriptionResult!
   deleteConnector(connectorId: ID!): IntegrationConnector!

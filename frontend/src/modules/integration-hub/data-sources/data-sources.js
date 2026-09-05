@@ -130,6 +130,56 @@ function structuredSettingsFrom(fields, prefix, d) {
   return out;
 }
 
+/* Shared between the Create drawer (submitted alongside createConnector)
+   and the post-creation Settings drawer (submitted via
+   updateConnectorSettings) - same validated shape either way. Returns
+   `{ error }` (a toast-ready message) instead of throwing, since both
+   callers need to bail out of their own submit handler on failure. */
+function assembleSettingsPayload(d, provider, connectorType) {
+  const settings = {};
+  let jsonFieldError = null;
+  settingsFieldsForProvider(provider).forEach((f) => {
+    if (f.type === 'checkbox') { settings[f.id] = !!d[f.id]; return; }
+    if (f.type === 'number') { settings[f.id] = d[f.id] === '' ? null : Number(d[f.id]); return; }
+    if (f.type === 'json') {
+      if (d[f.id] === '') { settings[f.id] = null; return; }
+      try { settings[f.id] = JSON.parse(d[f.id]); } catch { jsonFieldError = f.label; }
+      return;
+    }
+    settings[f.id] = d[f.id] === '' ? null : d[f.id];
+  });
+  if (jsonFieldError) return { error: `"${jsonFieldError}" must be valid JSON.` };
+  if (provider === NATS_ACD_PROVIDER) {
+    if (!d.onpremNatsSubject.trim()) return { error: 'Subject is required.' };
+    const natsUrls = d.onpremNatsUrls.split('\n').map((u) => u.trim()).filter(Boolean);
+    if (natsUrls.length === 0) return { error: 'At least one NATS server URL is required.' };
+    if (d.onpremNatsUseJetStream && (!d.onpremNatsStreamName.trim() || !d.onpremNatsDurableName.trim())) {
+      return { error: 'Stream Name and Durable Consumer Name are required when Use JetStream is checked.' };
+    }
+    settings.onpremNats = {
+      natsUrls,
+      subject: d.onpremNatsSubject.trim(),
+      queueGroup: d.onpremNatsQueueGroup.trim() || undefined,
+      useJetStream: !!d.onpremNatsUseJetStream,
+      streamName: d.onpremNatsUseJetStream ? d.onpremNatsStreamName.trim() : undefined,
+      durableName: d.onpremNatsUseJetStream ? d.onpremNatsDurableName.trim() : undefined,
+      ackWaitSeconds: d.onpremNatsAckWaitSeconds === '' ? undefined : Number(d.onpremNatsAckWaitSeconds),
+    };
+    Object.keys(settings.onpremNats).forEach((k) => { if (settings.onpremNats[k] === undefined) delete settings.onpremNats[k]; });
+  }
+  if (connectorType === 'ACD') {
+    settings.recorderSettings = structuredSettingsFrom(RECORDER_FIELDS, 'rec', d);
+    settings.recorderTdmSettings = structuredSettingsFrom(RECORDER_TDM_FIELDS, 'tdm', d);
+    settings.sipCallTracking = structuredSettingsFrom(SIP_CALL_TRACKING_FIELDS, 'sip', d);
+    for (const e of d.deviceIpConfigs) {
+      if (!e.ipAddressOrHostName.trim()) return { error: 'IP Address / Host Name is required for every Device IP Configuration row.' };
+    }
+    settings.deviceIpConfiguration = d.deviceIpConfigs.map((e) => ({ serverType: e.serverType, ipAddressOrHostName: e.ipAddressOrHostName.trim() }));
+  }
+  Object.keys(settings).forEach((k) => { if (settings[k] === null) delete settings[k]; });
+  return { settings };
+}
+
 const INTEGRATION_SERVERS_QUERY = `query { integrationServers { id name serverName } }`;
 const SERVERS_FOR_CONNECTOR_QUERY = `query($connectorId: ID!) { integrationServersForConnector(connectorId: $connectorId) { id serverId } }`;
 const ASSOCIATE_SERVER_MUTATION = `mutation($connectorId: ID!, $serverId: ID!) { associateIntegrationServer(connectorId: $connectorId, serverId: $serverId) { id } }`;
@@ -175,6 +225,71 @@ function renderServerAssociations(state, connectorId) {
           return `<tr><td>${esc(s ? `${s.name} (${s.serverName})` : a.serverId)}</td><td><button class="btn btn-sm btn-danger" data-wf="ds-server-assoc-remove" data-id="${a.serverId}">Remove</button></td></tr>`;
         }).join('')}
       </tbody></table>`}
+  `;
+}
+
+/* Shared between the Create drawer and the post-creation Settings drawer -
+   same WFM/Timezone/Scorecards/NATS/Recorder-registry fields either way,
+   so a tenant admin can configure everything in one step instead of a
+   required follow-up edit. "Integration Service Associations" is the one
+   section that can't move here — it links to this connector's own id via
+   a real join table row, which doesn't exist until the connector does —
+   so the create-time drawer shows a note instead of the picker. */
+function renderConnectorSettingsHtml(provider, connectorType, d, associationsHtml) {
+  return `
+    <h4 style="margin:0 0 8px">General / WFM / Time Zone / Scorecards Settings</h4>
+    ${settingsFieldsForProvider(provider).map((f) => `
+      <div class="field" style="margin-top:10px">
+        <label>${f.label}</label>
+        ${f.type === 'checkbox'
+          ? `<input type="checkbox" data-wf="ds-settings-field" data-id="${f.id}" ${d[f.id] ? 'checked' : ''} />`
+          : f.type === 'json'
+            ? `<textarea data-wf="ds-settings-field" data-id="${f.id}" rows="4" class="mono" placeholder="${esc(f.placeholder || '')}">${esc(d[f.id])}</textarea>`
+            : `<input type="${f.type === 'number' ? 'number' : 'text'}" data-wf="ds-settings-field" data-id="${f.id}" placeholder="${esc(f.placeholder || '')}" value="${esc(d[f.id])}" />`}
+      </div>`).join('')}
+    ${provider === NATS_ACD_PROVIDER ? `
+    <h4 style="margin:20px 0 8px">On-Prem NATS ACD Settings</h4>
+    <div class="field" style="margin-top:10px"><label>NATS Server URLs (one per line)</label>
+      <textarea data-wf="ds-settings-field" data-id="onpremNatsUrls" rows="3" class="mono" placeholder="nats://acd-gateway.customer.local:4222">${esc(d.onpremNatsUrls)}</textarea>
+    </div>
+    <div class="field" style="margin-top:10px"><label>Subject</label><input data-wf="ds-settings-field" data-id="onpremNatsSubject" placeholder="acd.agent.state.&gt;" value="${esc(d.onpremNatsSubject)}" /></div>
+    <div class="field" style="margin-top:10px"><label>Queue Group (optional — load-balances across multiple integration-hub-service instances)</label><input data-wf="ds-settings-field" data-id="onpremNatsQueueGroup" value="${esc(d.onpremNatsQueueGroup)}" /></div>
+    <div class="field" style="margin-top:10px">
+      <label><input type="checkbox" data-wf="ds-settings-field" data-id="onpremNatsUseJetStream" ${d.onpremNatsUseJetStream ? 'checked' : ''} /> Use JetStream (durable — requires JetStream enabled on the customer's own NATS server)</label>
+    </div>
+    ${d.onpremNatsUseJetStream ? `
+      <div class="grid-2" style="margin-top:10px">
+        <div class="field"><label>Stream Name</label><input data-wf="ds-settings-field" data-id="onpremNatsStreamName" value="${esc(d.onpremNatsStreamName)}" /></div>
+        <div class="field"><label>Durable Consumer Name</label><input data-wf="ds-settings-field" data-id="onpremNatsDurableName" value="${esc(d.onpremNatsDurableName)}" /></div>
+      </div>
+      <div class="field" style="margin-top:10px"><label>Ack Wait (seconds, optional)</label><input type="number" data-wf="ds-settings-field" data-id="onpremNatsAckWaitSeconds" value="${esc(d.onpremNatsAckWaitSeconds)}" /></div>
+    ` : `<p class="hint">Without JetStream, an event published while this platform is disconnected is not redelivered — confirm this is acceptable, or enable JetStream on the customer's server.</p>`}
+    ` : ''}
+    ${connectorType === 'ACD' ? `
+    <p class="hint" style="margin-top:16px">Recorder/TDM/Device IP/SIP Call Tracking below are a real, persisted registry of your own on-prem recording infrastructure (real field names from Verint WFO/EMT's own admin screens) — not a live control plane. Nothing on this platform acts on these values; see Integration Servers for the same framing.</p>
+    <h4 style="margin:16px 0 8px">Recorder Settings</h4>
+    ${renderStructuredFields(RECORDER_FIELDS, 'rec', d)}
+    <h4 style="margin:20px 0 8px">Recorder TDM Settings</h4>
+    ${renderStructuredFields(RECORDER_TDM_FIELDS, 'tdm', d)}
+    <h4 style="margin:20px 0 8px">Device IP Configuration</h4>
+    ${d.deviceIpConfigs.map((e, i) => `
+      <div class="grid-2" style="margin-top:10px">
+        <div class="field"><label>Server Type</label>
+          <select data-wf="ds-device-ip-field" data-id="${i}:serverType">${DEVICE_IP_SERVER_TYPES.map((t) => `<option value="${t.id}" ${e.serverType === t.id ? 'selected' : ''}>${esc(t.label)}</option>`).join('')}</select>
+        </div>
+        <div class="field"><label>IP Address / Host Name</label>
+          <div style="display:flex;gap:8px">
+            <input style="flex:1" data-wf="ds-device-ip-field" data-id="${i}:ipAddressOrHostName" value="${esc(e.ipAddressOrHostName)}" />
+            <button class="btn btn-sm btn-danger" data-wf="ds-device-ip-remove" data-id="${i}">Remove</button>
+          </div>
+        </div>
+      </div>`).join('')}
+    <button class="btn btn-sm" style="margin-top:10px" data-wf="ds-device-ip-add">+ Add Device IP Configuration</button>
+    <h4 style="margin:20px 0 8px">SIP Call Tracking</h4>
+    ${renderStructuredFields(SIP_CALL_TRACKING_FIELDS, 'sip', d)}
+    <h4 style="margin:20px 0 8px">Integration Service Associations</h4>
+    ${associationsHtml}
+    ` : ''}
   `;
 }
 
@@ -320,12 +435,12 @@ function providerCatalogEntry(providerValue) {
 
 const LIST_QUERY = `query { connectors { id connectorType provider status lastSyncAt lastSyncStatus settings } }`;
 const CREATE_MUTATION = `mutation Create(
-  $connectorType: ConnectorType!, $provider: String!, $credentials: JSON, $additionalConfig: JSON,
+  $connectorType: ConnectorType!, $provider: String!, $credentials: JSON, $additionalConfig: JSON, $settings: JSON,
   $oauthClientId: String, $oauthClientSecret: String, $oauthAuthorizationEndpoint: String,
   $oauthTokenEndpoint: String, $oauthRedirectUri: String, $oauthScope: String
 ) {
   createConnector(
-    connectorType: $connectorType, provider: $provider, credentials: $credentials, additionalConfig: $additionalConfig,
+    connectorType: $connectorType, provider: $provider, credentials: $credentials, additionalConfig: $additionalConfig, settings: $settings,
     oauthClientId: $oauthClientId, oauthClientSecret: $oauthClientSecret,
     oauthAuthorizationEndpoint: $oauthAuthorizationEndpoint, oauthTokenEndpoint: $oauthTokenEndpoint,
     oauthRedirectUri: $oauthRedirectUri, oauthScope: $oauthScope
@@ -388,6 +503,7 @@ function emptyConnectorDraft() {
     natsNkeySeed: '',
     natsCredsFile: '',
     natsTlsCaCert: '',
+    settingsDraft: settingsDraftFrom({ provider: '', connectorType: CONNECTOR_TYPES[0], settings: {} }),
   };
 }
 
@@ -530,6 +646,7 @@ export function renderDrawer(state) {
     const entry = providerCatalogEntry(d.provider);
     const isNats = entry && entry.special === 'nats';
     const isCustom = entry && entry.special === 'custom';
+    const providerValueForSettings = isCustom ? d.customProvider.trim() : d.provider;
     return drawerShell(
       'New Data Source',
       'GraphQL: createConnector — real, named fields per provider, not a generic credentials blob',
@@ -578,6 +695,15 @@ export function renderDrawer(state) {
           ${catalogFieldsHtml(entry.configFields, d.configFieldValues, 'ds-config-field')}
         ` : ''}
       ` : ''}
+      ${d.provider ? `
+        <hr style="margin:20px 0" />
+        ${renderConnectorSettingsHtml(
+          providerValueForSettings,
+          d.connectorType,
+          d.settingsDraft,
+          '<p class="muted">Available once this data source is created — it links to the data source\'s own id.</p>',
+        )}
+      ` : ''}
       `,
       `<button class="btn" data-wf="close-drawer">Cancel</button>`,
       `<button class="btn btn-primary" data-wf="ds-connector-go" ${saving ? 'disabled' : ''}>${saving ? 'Creating…' : 'Create'}</button>`,
@@ -596,59 +722,7 @@ export function renderDrawer(state) {
       `${connector.provider} (${connector.connectorType})`,
       `Status: ${connector.status} · id ${connector.id}`,
       `
-      <h4 style="margin:0 0 8px">General / WFM / Time Zone / Scorecards Settings</h4>
-      ${settingsFieldsForProvider(connector.provider).map((f) => `
-        <div class="field" style="margin-top:10px">
-          <label>${f.label}</label>
-          ${f.type === 'checkbox'
-            ? `<input type="checkbox" data-wf="ds-settings-field" data-id="${f.id}" ${d[f.id] ? 'checked' : ''} />`
-            : f.type === 'json'
-              ? `<textarea data-wf="ds-settings-field" data-id="${f.id}" rows="4" class="mono" placeholder="${esc(f.placeholder || '')}">${esc(d[f.id])}</textarea>`
-              : `<input type="${f.type === 'number' ? 'number' : 'text'}" data-wf="ds-settings-field" data-id="${f.id}" placeholder="${esc(f.placeholder || '')}" value="${esc(d[f.id])}" />`}
-        </div>`).join('')}
-      ${connector.provider === NATS_ACD_PROVIDER ? `
-      <h4 style="margin:20px 0 8px">On-Prem NATS ACD Settings</h4>
-      <div class="field" style="margin-top:10px"><label>NATS Server URLs (one per line)</label>
-        <textarea data-wf="ds-settings-field" data-id="onpremNatsUrls" rows="3" class="mono" placeholder="nats://acd-gateway.customer.local:4222">${esc(d.onpremNatsUrls)}</textarea>
-      </div>
-      <div class="field" style="margin-top:10px"><label>Subject</label><input data-wf="ds-settings-field" data-id="onpremNatsSubject" placeholder="acd.agent.state.&gt;" value="${esc(d.onpremNatsSubject)}" /></div>
-      <div class="field" style="margin-top:10px"><label>Queue Group (optional — load-balances across multiple integration-hub-service instances)</label><input data-wf="ds-settings-field" data-id="onpremNatsQueueGroup" value="${esc(d.onpremNatsQueueGroup)}" /></div>
-      <div class="field" style="margin-top:10px">
-        <label><input type="checkbox" data-wf="ds-settings-field" data-id="onpremNatsUseJetStream" ${d.onpremNatsUseJetStream ? 'checked' : ''} /> Use JetStream (durable — requires JetStream enabled on the customer's own NATS server)</label>
-      </div>
-      ${d.onpremNatsUseJetStream ? `
-        <div class="grid-2" style="margin-top:10px">
-          <div class="field"><label>Stream Name</label><input data-wf="ds-settings-field" data-id="onpremNatsStreamName" value="${esc(d.onpremNatsStreamName)}" /></div>
-          <div class="field"><label>Durable Consumer Name</label><input data-wf="ds-settings-field" data-id="onpremNatsDurableName" value="${esc(d.onpremNatsDurableName)}" /></div>
-        </div>
-        <div class="field" style="margin-top:10px"><label>Ack Wait (seconds, optional)</label><input type="number" data-wf="ds-settings-field" data-id="onpremNatsAckWaitSeconds" value="${esc(d.onpremNatsAckWaitSeconds)}" /></div>
-      ` : `<p class="hint">Without JetStream, an event published while this platform is disconnected is not redelivered — confirm this is acceptable, or enable JetStream on the customer's server.</p>`}
-      ` : ''}
-      ${connector.connectorType === 'ACD' ? `
-      <p class="hint" style="margin-top:16px">Recorder/TDM/Device IP/SIP Call Tracking below are a real, persisted registry of your own on-prem recording infrastructure (real field names from Verint WFO/EMT's own admin screens) — not a live control plane. Nothing on this platform acts on these values; see Integration Servers for the same framing.</p>
-      <h4 style="margin:16px 0 8px">Recorder Settings</h4>
-      ${renderStructuredFields(RECORDER_FIELDS, 'rec', d)}
-      <h4 style="margin:20px 0 8px">Recorder TDM Settings</h4>
-      ${renderStructuredFields(RECORDER_TDM_FIELDS, 'tdm', d)}
-      <h4 style="margin:20px 0 8px">Device IP Configuration</h4>
-      ${d.deviceIpConfigs.map((e, i) => `
-        <div class="grid-2" style="margin-top:10px">
-          <div class="field"><label>Server Type</label>
-            <select data-wf="ds-device-ip-field" data-id="${i}:serverType">${DEVICE_IP_SERVER_TYPES.map((t) => `<option value="${t.id}" ${e.serverType === t.id ? 'selected' : ''}>${esc(t.label)}</option>`).join('')}</select>
-          </div>
-          <div class="field"><label>IP Address / Host Name</label>
-            <div style="display:flex;gap:8px">
-              <input style="flex:1" data-wf="ds-device-ip-field" data-id="${i}:ipAddressOrHostName" value="${esc(e.ipAddressOrHostName)}" />
-              <button class="btn btn-sm btn-danger" data-wf="ds-device-ip-remove" data-id="${i}">Remove</button>
-            </div>
-          </div>
-        </div>`).join('')}
-      <button class="btn btn-sm" style="margin-top:10px" data-wf="ds-device-ip-add">+ Add Device IP Configuration</button>
-      <h4 style="margin:20px 0 8px">SIP Call Tracking</h4>
-      ${renderStructuredFields(SIP_CALL_TRACKING_FIELDS, 'sip', d)}
-      <h4 style="margin:20px 0 8px">Integration Service Associations</h4>
-      ${renderServerAssociations(state, connector.id)}
-      ` : ''}
+      ${renderConnectorSettingsHtml(connector.provider, connector.connectorType, d, renderServerAssociations(state, connector.id))}
       ${testResultBadge(state.dsTestResult)}
       `,
       `<button class="btn" data-wf="close-drawer">Close</button><button class="btn" data-wf="ds-settings-revert" ${dirty ? '' : 'disabled'}>Revert</button>`,
@@ -656,6 +730,14 @@ export function renderDrawer(state) {
     );
   }
   return '';
+}
+
+/* The Create drawer's settings section and the post-creation Settings
+   drawer share every field-editing action below (ds-settings-field,
+   ds-structured-field, ds-device-ip-*) - this is which draft object
+   "the settings section currently on screen" actually means. */
+function activeSettingsDraft(state) {
+  return state.drawer === 'ds-connector' ? state.dsConnectorDraft.settingsDraft : state.dsSettingsDraft;
 }
 
 export function handle(state, act, id, value) {
@@ -676,6 +758,9 @@ export function handle(state, act, id, value) {
       if (entry && entry.connectorType) state.dsConnectorDraft.connectorType = entry.connectorType;
       state.dsConnectorDraft.credentialFieldValues = {};
       state.dsConnectorDraft.configFieldValues = {};
+    }
+    if (id === 'provider' || id === 'connectorType') {
+      state.dsConnectorDraft.settingsDraft = settingsDraftFrom({ provider: state.dsConnectorDraft.provider, connectorType: state.dsConnectorDraft.connectorType, settings: {} });
     }
     return true;
   }
@@ -735,6 +820,8 @@ export function handle(state, act, id, value) {
         }
       }
     }
+    const { settings, error: settingsError } = assembleSettingsPayload(d.settingsDraft, providerValue, d.connectorType);
+    if (settingsError) { toast(settingsError); return true; }
     state.wf.saving.dsConnector = true;
     doRerender();
     Api.integrationHubGql(CREATE_MUTATION, {
@@ -742,6 +829,7 @@ export function handle(state, act, id, value) {
       provider: providerValue,
       credentials: (isNats || entry) ? credentials : (d.authMode === 'credentials' ? credentials : undefined),
       additionalConfig,
+      settings: Object.keys(settings).length > 0 ? settings : undefined,
       oauthClientId: (isCustom && d.authMode === 'oauth') ? d.oauthClientId.trim() || undefined : undefined,
       oauthClientSecret: (isCustom && d.authMode === 'oauth') ? d.oauthClientSecret.trim() || undefined : undefined,
       oauthAuthorizationEndpoint: (isCustom && d.authMode === 'oauth') ? d.oauthAuthorizationEndpoint.trim() || undefined : undefined,
@@ -775,6 +863,7 @@ export function handle(state, act, id, value) {
   if (act === 'ds-settings-field') {
     const field = SETTINGS_FIELDS.find((f) => f.id === id);
     const isCheckboxField = (field && field.type === 'checkbox') || id === 'onpremNatsUseJetStream';
+    const d = activeSettingsDraft(state);
     // The click listener that actually fires for a checkbox (app/shell.js)
     // calls preventDefault() on every data-wf element it matches — which
     // blocks the checkbox's own native toggle (and the 'change' event that
@@ -782,27 +871,28 @@ export function handle(state, act, id, value) {
     // state change for a checkbox. Flipping the current draft value is the
     // same "toggle, don't trust the DOM value" pattern this app's other
     // dedicated toggle actions (e.g. sc-maintenance-toggle) already use.
-    state.dsSettingsDraft[id] = isCheckboxField ? !state.dsSettingsDraft[id] : value;
+    d[id] = isCheckboxField ? !d[id] : value;
     return true;
   }
   if (act === 'ds-structured-field') {
     const [prefix, fields] = id.startsWith('rec') ? ['rec', RECORDER_FIELDS] : id.startsWith('tdm') ? ['tdm', RECORDER_TDM_FIELDS] : ['sip', SIP_CALL_TRACKING_FIELDS];
     const field = fields.find((f) => structuredFieldPrefixKey(prefix, f.id) === id);
     const isCheckboxField = field && field.type === 'checkbox';
-    state.dsSettingsDraft[id] = isCheckboxField ? !state.dsSettingsDraft[id] : value;
+    const d = activeSettingsDraft(state);
+    d[id] = isCheckboxField ? !d[id] : value;
     return true;
   }
   if (act === 'ds-device-ip-field') {
     const [indexStr, field] = id.split(':');
-    state.dsSettingsDraft.deviceIpConfigs[Number(indexStr)][field] = value;
+    activeSettingsDraft(state).deviceIpConfigs[Number(indexStr)][field] = value;
     return true;
   }
   if (act === 'ds-device-ip-add') {
-    state.dsSettingsDraft.deviceIpConfigs.push({ serverType: DEVICE_IP_SERVER_TYPES[0].id, ipAddressOrHostName: '' });
+    activeSettingsDraft(state).deviceIpConfigs.push({ serverType: DEVICE_IP_SERVER_TYPES[0].id, ipAddressOrHostName: '' });
     return true;
   }
   if (act === 'ds-device-ip-remove') {
-    state.dsSettingsDraft.deviceIpConfigs.splice(Number(id), 1);
+    activeSettingsDraft(state).deviceIpConfigs.splice(Number(id), 1);
     return true;
   }
   if (act === 'ds-server-assoc-select') { state.dsServerAssocSelectId = value; return true; }
@@ -827,49 +917,9 @@ export function handle(state, act, id, value) {
   }
   if (act === 'ds-settings-save') {
     const d = state.dsSettingsDraft;
-    const settings = {};
-    let jsonFieldError = null;
     const connectorForSave = state.wf.connectors.rows.find((c) => c.id === state.dsDetailId);
-    settingsFieldsForProvider(connectorForSave ? connectorForSave.provider : '').forEach((f) => {
-      if (f.type === 'checkbox') { settings[f.id] = !!d[f.id]; return; }
-      if (f.type === 'number') { settings[f.id] = d[f.id] === '' ? null : Number(d[f.id]); return; }
-      if (f.type === 'json') {
-        if (d[f.id] === '') { settings[f.id] = null; return; }
-        try { settings[f.id] = JSON.parse(d[f.id]); } catch { jsonFieldError = f.label; }
-        return;
-      }
-      settings[f.id] = d[f.id] === '' ? null : d[f.id];
-    });
-    if (jsonFieldError) { toast(`"${jsonFieldError}" must be valid JSON.`); return true; }
-    if (connectorForSave && connectorForSave.provider === NATS_ACD_PROVIDER) {
-      if (!d.onpremNatsSubject.trim()) { toast('Subject is required.'); return true; }
-      const natsUrls = d.onpremNatsUrls.split('\n').map((u) => u.trim()).filter(Boolean);
-      if (natsUrls.length === 0) { toast('At least one NATS server URL is required.'); return true; }
-      if (d.onpremNatsUseJetStream && (!d.onpremNatsStreamName.trim() || !d.onpremNatsDurableName.trim())) {
-        toast('Stream Name and Durable Consumer Name are required when Use JetStream is checked.');
-        return true;
-      }
-      settings.onpremNats = {
-        natsUrls,
-        subject: d.onpremNatsSubject.trim(),
-        queueGroup: d.onpremNatsQueueGroup.trim() || undefined,
-        useJetStream: !!d.onpremNatsUseJetStream,
-        streamName: d.onpremNatsUseJetStream ? d.onpremNatsStreamName.trim() : undefined,
-        durableName: d.onpremNatsUseJetStream ? d.onpremNatsDurableName.trim() : undefined,
-        ackWaitSeconds: d.onpremNatsAckWaitSeconds === '' ? undefined : Number(d.onpremNatsAckWaitSeconds),
-      };
-      Object.keys(settings.onpremNats).forEach((k) => { if (settings.onpremNats[k] === undefined) delete settings.onpremNats[k]; });
-    }
-    if (connectorForSave && connectorForSave.connectorType === 'ACD') {
-      settings.recorderSettings = structuredSettingsFrom(RECORDER_FIELDS, 'rec', d);
-      settings.recorderTdmSettings = structuredSettingsFrom(RECORDER_TDM_FIELDS, 'tdm', d);
-      settings.sipCallTracking = structuredSettingsFrom(SIP_CALL_TRACKING_FIELDS, 'sip', d);
-      for (const e of d.deviceIpConfigs) {
-        if (!e.ipAddressOrHostName.trim()) { toast('IP Address / Host Name is required for every Device IP Configuration row.'); return true; }
-      }
-      settings.deviceIpConfiguration = d.deviceIpConfigs.map((e) => ({ serverType: e.serverType, ipAddressOrHostName: e.ipAddressOrHostName.trim() }));
-    }
-    Object.keys(settings).forEach((k) => { if (settings[k] === null) delete settings[k]; });
+    const { settings, error } = assembleSettingsPayload(d, connectorForSave ? connectorForSave.provider : '', connectorForSave ? connectorForSave.connectorType : '');
+    if (error) { toast(error); return true; }
     state.wf.saving.dsSettings = true;
     doRerender();
     Api.integrationHubGql(UPDATE_SETTINGS_MUTATION, { connectorId: state.dsDetailId, settings })

@@ -78,6 +78,7 @@ export class IntegrationConnectorResolver {
     @Args('provider') provider: string,
     @Args('credentials', { type: () => Object, nullable: true }) credentials?: Record<string, unknown>,
     @Args('additionalConfig', { type: () => Object, nullable: true }) additionalConfig?: Record<string, unknown>,
+    @Args('settings', { type: () => Object, nullable: true }) settings?: Record<string, unknown>,
     @Args('oauthClientId', { nullable: true }) oauthClientId?: string,
     @Args('oauthClientSecret', { nullable: true }) oauthClientSecret?: string,
     @Args('oauthAuthorizationEndpoint', { nullable: true }) oauthAuthorizationEndpoint?: string,
@@ -99,7 +100,7 @@ export class IntegrationConnectorResolver {
       : undefined;
     const result = await this.connectors.create(
       tenantId,
-      { connectorType, provider, credentials, additionalConfig, oauth },
+      { connectorType, provider, credentials, additionalConfig, settings, oauth },
       actorFromClaims(claims),
     );
     return toCreateConnectorResultType(result);
