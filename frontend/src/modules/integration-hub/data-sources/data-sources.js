@@ -14,6 +14,22 @@ const CONNECTOR_TYPES = ['HRIS', 'PAYROLL', 'ACD', 'CRM', 'CUSTOM_WEBHOOK', 'DAT
 const BATCH_TYPES = new Set(['HRIS', 'PAYROLL', 'CRM']);
 const ACD_TYPES = new Set(['ACD']);
 
+/* On-prem customer ACD publishing into their own NATS bus — the one
+   streaming connector where the credential shape and connection topology
+   are the customer's own infrastructure facts, not a vendor's published
+   API contract, so a generic "Credentials (JSON)" textarea would just push
+   the same schema knowledge onto the tenant admin with no guardrails. Real,
+   labeled fields instead — same principle NatsAcdAdapter's own doc comment
+   applies server-side: no generic shape, only what NATS's real API and
+   JetStream's real durable-consumer model actually require. */
+const NATS_ACD_PROVIDER = 'onprem-nats-acd';
+const NATS_AUTH_TYPES = [
+  { id: 'token', label: 'Token' },
+  { id: 'userpass', label: 'Username & Password' },
+  { id: 'nkey', label: 'NKey Seed' },
+  { id: 'creds', label: 'Credentials File (JWT)' },
+];
+
 const LIST_QUERY = `query { connectors { id connectorType provider status lastSyncAt lastSyncStatus settings } }`;
 const CREATE_MUTATION = `mutation Create(
   $connectorType: ConnectorType!, $provider: String!, $credentials: JSON,
@@ -73,8 +89,29 @@ function emptyConnectorDraft() {
     oauthTokenEndpoint: '',
     oauthRedirectUri: '',
     oauthScope: '',
+    natsAuthType: 'token',
+    natsToken: '',
+    natsUser: '',
+    natsPass: '',
+    natsNkeySeed: '',
+    natsCredsFile: '',
+    natsTlsCaCert: '',
   };
 }
+
+function isNatsAcdDraft(d) {
+  return d.connectorType === 'ACD' && d.provider.trim() === NATS_ACD_PROVIDER;
+}
+
+const NATS_SETTINGS_DRAFT_DEFAULTS = {
+  onpremNatsUrls: '',
+  onpremNatsSubject: '',
+  onpremNatsQueueGroup: '',
+  onpremNatsUseJetStream: false,
+  onpremNatsStreamName: '',
+  onpremNatsDurableName: '',
+  onpremNatsAckWaitSeconds: '',
+};
 
 function settingsDraftFrom(connector) {
   const s = connector.settings || {};
@@ -84,6 +121,18 @@ function settingsDraftFrom(connector) {
     if (f.type === 'json') { d[f.id] = s[f.id] ? JSON.stringify(s[f.id], null, 2) : ''; return; }
     d[f.id] = s[f.id] ?? '';
   });
+  if (connector.provider === NATS_ACD_PROVIDER) {
+    const n = s.onpremNats || {};
+    Object.assign(d, NATS_SETTINGS_DRAFT_DEFAULTS, {
+      onpremNatsUrls: Array.isArray(n.natsUrls) ? n.natsUrls.join('\n') : '',
+      onpremNatsSubject: n.subject || '',
+      onpremNatsQueueGroup: n.queueGroup || '',
+      onpremNatsUseJetStream: !!n.useJetStream,
+      onpremNatsStreamName: n.streamName || '',
+      onpremNatsDurableName: n.durableName || '',
+      onpremNatsAckWaitSeconds: n.ackWaitSeconds ?? '',
+    });
+  }
   return d;
 }
 
@@ -142,10 +191,32 @@ function testResultBadge(result) {
   return `<div class="hint" style="margin-top:10px">${result.ok ? '<span class="badge badge-ok">Connection OK</span>' : '<span class="badge badge-danger">Connection failed</span>'} ${esc(result.detail)} <span class="muted">(checked ${fmtDt(result.checkedAt)})</span></div>`;
 }
 
+function natsAuthFieldsHtml(d) {
+  const perType = {
+    token: `<div class="field" style="margin-top:10px"><label>Token</label><input data-wf="ds-connector-field" data-id="natsToken" type="password" value="${esc(d.natsToken)}" /></div>`,
+    userpass: `<div class="grid-2" style="margin-top:10px">
+        <div class="field"><label>Username</label><input data-wf="ds-connector-field" data-id="natsUser" value="${esc(d.natsUser)}" /></div>
+        <div class="field"><label>Password</label><input data-wf="ds-connector-field" data-id="natsPass" type="password" value="${esc(d.natsPass)}" /></div>
+      </div>`,
+    nkey: `<div class="field" style="margin-top:10px"><label>NKey Seed</label><textarea data-wf="ds-connector-field" data-id="natsNkeySeed" rows="2" class="mono" placeholder="SU...">${esc(d.natsNkeySeed)}</textarea></div>`,
+    creds: `<div class="field" style="margin-top:10px"><label>Credentials File (.creds contents)</label><textarea data-wf="ds-connector-field" data-id="natsCredsFile" rows="5" class="mono" placeholder="-----BEGIN NATS USER JWT-----...">${esc(d.natsCredsFile)}</textarea></div>`,
+  };
+  return `
+    <div class="field" style="margin-top:10px"><label>NATS Authentication Type</label>
+      <select data-wf="ds-connector-field" data-id="natsAuthType">${NATS_AUTH_TYPES.map((t) => `<option value="${t.id}" ${d.natsAuthType === t.id ? 'selected' : ''}>${t.label}</option>`).join('')}</select>
+      <p class="hint">Confirm with the customer's NATS operator which mechanism their on-prem server enforces — there is no way to detect it from outside.</p>
+    </div>
+    ${perType[d.natsAuthType] || ''}
+    <div class="field" style="margin-top:10px"><label>TLS CA Certificate (optional — for a self-signed on-prem server)</label>
+      <textarea data-wf="ds-connector-field" data-id="natsTlsCaCert" rows="4" class="mono" placeholder="-----BEGIN CERTIFICATE-----...">${esc(d.natsTlsCaCert)}</textarea>
+    </div>`;
+}
+
 export function renderDrawer(state) {
   if (state.drawer === 'ds-connector') {
     const d = state.dsConnectorDraft;
     const saving = state.wf.saving.dsConnector;
+    const isNats = isNatsAcdDraft(d);
     return drawerShell(
       'New Data Source',
       'GraphQL: createConnector — exactly one of credentials or OAuth is required',
@@ -154,8 +225,12 @@ export function renderDrawer(state) {
         <div class="field"><label>Type</label>
           <select data-wf="ds-connector-field" data-id="connectorType">${CONNECTOR_TYPES.map((t) => `<option value="${t}" ${d.connectorType === t ? 'selected' : ''}>${t}</option>`).join('')}</select>
         </div>
-        <div class="field"><label>Provider</label><input data-wf="ds-connector-field" data-id="provider" placeholder="e.g. workday, adp, salesforce" value="${esc(d.provider)}" /></div>
+        <div class="field"><label>Provider</label><input data-wf="ds-connector-field" data-id="provider" placeholder="e.g. workday, adp, salesforce, ${NATS_ACD_PROVIDER}" value="${esc(d.provider)}" /></div>
       </div>
+      ${isNats ? `
+        <p class="hint" style="margin-top:10px">On-prem customer ACD via NATS — real per-mechanism auth fields below, not a generic credentials blob.</p>
+        ${natsAuthFieldsHtml(d)}
+      ` : `
       <div class="field" style="margin-top:10px"><label>Authentication</label>
         <select data-wf="ds-connector-field" data-id="authMode">
           <option value="credentials" ${d.authMode === 'credentials' ? 'selected' : ''}>API credentials</option>
@@ -174,6 +249,7 @@ export function renderDrawer(state) {
         <div class="field" style="margin-top:10px"><label>Token endpoint</label><input data-wf="ds-connector-field" data-id="oauthTokenEndpoint" value="${esc(d.oauthTokenEndpoint)}" /></div>
         <div class="field" style="margin-top:10px"><label>Redirect URI</label><input data-wf="ds-connector-field" data-id="oauthRedirectUri" value="${esc(d.oauthRedirectUri)}" /></div>
         <div class="field" style="margin-top:10px"><label>Scope</label><input data-wf="ds-connector-field" data-id="oauthScope" value="${esc(d.oauthScope)}" /></div>`}
+      `}
       `,
       `<button class="btn" data-wf="close-drawer">Cancel</button>`,
       `<button class="btn btn-primary" data-wf="ds-connector-go" ${saving ? 'disabled' : ''}>${saving ? 'Creating…' : 'Create'}</button>`,
@@ -202,6 +278,24 @@ export function renderDrawer(state) {
               ? `<textarea data-wf="ds-settings-field" data-id="${f.id}" rows="4" class="mono" placeholder="${esc(f.placeholder || '')}">${esc(d[f.id])}</textarea>`
               : `<input type="${f.type === 'number' ? 'number' : 'text'}" data-wf="ds-settings-field" data-id="${f.id}" placeholder="${esc(f.placeholder || '')}" value="${esc(d[f.id])}" />`}
         </div>`).join('')}
+      ${connector.provider === NATS_ACD_PROVIDER ? `
+      <h4 style="margin:20px 0 8px">On-Prem NATS ACD Settings</h4>
+      <div class="field" style="margin-top:10px"><label>NATS Server URLs (one per line)</label>
+        <textarea data-wf="ds-settings-field" data-id="onpremNatsUrls" rows="3" class="mono" placeholder="nats://acd-gateway.customer.local:4222">${esc(d.onpremNatsUrls)}</textarea>
+      </div>
+      <div class="field" style="margin-top:10px"><label>Subject</label><input data-wf="ds-settings-field" data-id="onpremNatsSubject" placeholder="acd.agent.state.&gt;" value="${esc(d.onpremNatsSubject)}" /></div>
+      <div class="field" style="margin-top:10px"><label>Queue Group (optional — load-balances across multiple integration-hub-service instances)</label><input data-wf="ds-settings-field" data-id="onpremNatsQueueGroup" value="${esc(d.onpremNatsQueueGroup)}" /></div>
+      <div class="field" style="margin-top:10px">
+        <label><input type="checkbox" data-wf="ds-settings-field" data-id="onpremNatsUseJetStream" ${d.onpremNatsUseJetStream ? 'checked' : ''} /> Use JetStream (durable — requires JetStream enabled on the customer's own NATS server)</label>
+      </div>
+      ${d.onpremNatsUseJetStream ? `
+        <div class="grid-2" style="margin-top:10px">
+          <div class="field"><label>Stream Name</label><input data-wf="ds-settings-field" data-id="onpremNatsStreamName" value="${esc(d.onpremNatsStreamName)}" /></div>
+          <div class="field"><label>Durable Consumer Name</label><input data-wf="ds-settings-field" data-id="onpremNatsDurableName" value="${esc(d.onpremNatsDurableName)}" /></div>
+        </div>
+        <div class="field" style="margin-top:10px"><label>Ack Wait (seconds, optional)</label><input type="number" data-wf="ds-settings-field" data-id="onpremNatsAckWaitSeconds" value="${esc(d.onpremNatsAckWaitSeconds)}" /></div>
+      ` : `<p class="hint">Without JetStream, an event published while this platform is disconnected is not redelivered — confirm this is acceptable, or enable JetStream on the customer's server.</p>`}
+      ` : ''}
       <h4 style="margin:20px 0 8px">Recorder Settings</h4>
       <p>${gap('No recorder/telephony-hardware config concept exists in this SaaS architecture — nothing downstream reads these fields, so they are not shown.')}</p>
       <h4 style="margin:20px 0 8px">Recorder TDM Settings</h4>
@@ -236,8 +330,20 @@ export function handle(state, act, id, value) {
   if (act === 'ds-connector-go') {
     const d = state.dsConnectorDraft;
     if (!d.provider.trim()) { toast('Provider is required.'); return true; }
+    const isNats = isNatsAcdDraft(d);
     let credentials;
-    if (d.authMode === 'credentials') {
+    if (isNats) {
+      if (d.natsAuthType === 'token' && !d.natsToken.trim()) { toast('Token is required.'); return true; }
+      if (d.natsAuthType === 'userpass' && (!d.natsUser.trim() || !d.natsPass)) { toast('Username and password are required.'); return true; }
+      if (d.natsAuthType === 'nkey' && !d.natsNkeySeed.trim()) { toast('NKey seed is required.'); return true; }
+      if (d.natsAuthType === 'creds' && !d.natsCredsFile.trim()) { toast('Credentials file contents are required.'); return true; }
+      credentials = { authType: d.natsAuthType };
+      if (d.natsAuthType === 'token') credentials.token = d.natsToken.trim();
+      if (d.natsAuthType === 'userpass') { credentials.user = d.natsUser.trim(); credentials.pass = d.natsPass; }
+      if (d.natsAuthType === 'nkey') credentials.nkeySeed = d.natsNkeySeed.trim();
+      if (d.natsAuthType === 'creds') credentials.credsFile = d.natsCredsFile;
+      if (d.natsTlsCaCert.trim()) credentials.tlsCaCert = d.natsTlsCaCert.trim();
+    } else if (d.authMode === 'credentials') {
       try { credentials = JSON.parse(d.credentialsJson); } catch { toast('Credentials must be valid JSON.'); return true; }
     }
     state.wf.saving.dsConnector = true;
@@ -245,8 +351,8 @@ export function handle(state, act, id, value) {
     Api.integrationHubGql(CREATE_MUTATION, {
       connectorType: d.connectorType,
       provider: d.provider.trim(),
-      credentials: d.authMode === 'credentials' ? credentials : undefined,
-      oauthClientId: d.authMode === 'oauth' ? d.oauthClientId.trim() || undefined : undefined,
+      credentials: (isNats || d.authMode === 'credentials') ? credentials : undefined,
+      oauthClientId: (!isNats && d.authMode === 'oauth') ? d.oauthClientId.trim() || undefined : undefined,
       oauthClientSecret: d.authMode === 'oauth' ? d.oauthClientSecret.trim() || undefined : undefined,
       oauthAuthorizationEndpoint: d.authMode === 'oauth' ? d.oauthAuthorizationEndpoint.trim() || undefined : undefined,
       oauthTokenEndpoint: d.authMode === 'oauth' ? d.oauthTokenEndpoint.trim() || undefined : undefined,
@@ -277,7 +383,15 @@ export function handle(state, act, id, value) {
   }
   if (act === 'ds-settings-field') {
     const field = SETTINGS_FIELDS.find((f) => f.id === id);
-    state.dsSettingsDraft[id] = field && field.type === 'checkbox' ? value === true || value === 'true' : value;
+    const isCheckboxField = (field && field.type === 'checkbox') || id === 'onpremNatsUseJetStream';
+    // The click listener that actually fires for a checkbox (app/shell.js)
+    // calls preventDefault() on every data-wf element it matches — which
+    // blocks the checkbox's own native toggle (and the 'change' event that
+    // would otherwise follow it), so `value` here never reflects a real
+    // state change for a checkbox. Flipping the current draft value is the
+    // same "toggle, don't trust the DOM value" pattern this app's other
+    // dedicated toggle actions (e.g. sc-maintenance-toggle) already use.
+    state.dsSettingsDraft[id] = isCheckboxField ? !state.dsSettingsDraft[id] : value;
     return true;
   }
   if (act === 'ds-settings-revert') {
@@ -301,6 +415,26 @@ export function handle(state, act, id, value) {
       settings[f.id] = d[f.id] === '' ? null : d[f.id];
     });
     if (jsonFieldError) { toast(`"${jsonFieldError}" must be valid JSON.`); return true; }
+    const connectorForSave = state.wf.connectors.rows.find((c) => c.id === state.dsDetailId);
+    if (connectorForSave && connectorForSave.provider === NATS_ACD_PROVIDER) {
+      if (!d.onpremNatsSubject.trim()) { toast('Subject is required.'); return true; }
+      const natsUrls = d.onpremNatsUrls.split('\n').map((u) => u.trim()).filter(Boolean);
+      if (natsUrls.length === 0) { toast('At least one NATS server URL is required.'); return true; }
+      if (d.onpremNatsUseJetStream && (!d.onpremNatsStreamName.trim() || !d.onpremNatsDurableName.trim())) {
+        toast('Stream Name and Durable Consumer Name are required when Use JetStream is checked.');
+        return true;
+      }
+      settings.onpremNats = {
+        natsUrls,
+        subject: d.onpremNatsSubject.trim(),
+        queueGroup: d.onpremNatsQueueGroup.trim() || undefined,
+        useJetStream: !!d.onpremNatsUseJetStream,
+        streamName: d.onpremNatsUseJetStream ? d.onpremNatsStreamName.trim() : undefined,
+        durableName: d.onpremNatsUseJetStream ? d.onpremNatsDurableName.trim() : undefined,
+        ackWaitSeconds: d.onpremNatsAckWaitSeconds === '' ? undefined : Number(d.onpremNatsAckWaitSeconds),
+      };
+      Object.keys(settings.onpremNats).forEach((k) => { if (settings.onpremNats[k] === undefined) delete settings.onpremNats[k]; });
+    }
     Object.keys(settings).forEach((k) => { if (settings[k] === null) delete settings[k]; });
     state.wf.saving.dsSettings = true;
     doRerender();

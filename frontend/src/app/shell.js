@@ -883,7 +883,13 @@ setRerender(() => render());
   app.addEventListener("change", (e) => {
     const t = e.target;
     if (t.dataset.wf) {
-      if (activeModule().mod.handle(state, t.dataset.wf, t.dataset.id, t.value)) {
+      // A checkbox's `.value` is the static HTML value attribute (always
+      // "on" unless overridden) regardless of checked state - `.checked` is
+      // the actual signal. Every handler that keys off this event's value
+      // for a checkbox-type data-wf field needs the real boolean, not the
+      // literal string "on" on every toggle in either direction.
+      const wfValue = t.type === "checkbox" ? t.checked : t.value;
+      if (activeModule().mod.handle(state, t.dataset.wf, t.dataset.id, wfValue)) {
         /* Deferred, not synchronous: a "change" on a text field fires as a
            side effect of blur, which itself fires synchronously during
            mousedown when the user's very next action is clicking a

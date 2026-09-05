@@ -41,6 +41,7 @@ import { Five9Adapter } from './relay/providers/five9.adapter';
 import { TalkdeskAdapter } from './relay/providers/talkdesk.adapter';
 import { AxpAdapter } from './relay/providers/axp.adapter';
 import { AvayaAuraAdapter } from './relay/providers/avaya-aura.adapter';
+import { NatsAcdAdapter } from './relay/providers/nats-acd.adapter';
 
 /**
  * Phase 2 (§7): both the batch-runner base and the streaming-relay base.
@@ -120,6 +121,7 @@ import { AvayaAuraAdapter } from './relay/providers/avaya-aura.adapter';
     TalkdeskAdapter,
     AxpAdapter,
     AvayaAuraAdapter,
+    NatsAcdAdapter,
     {
       provide: STREAMING_RELAY_ADAPTERS,
       useFactory: (
@@ -129,8 +131,9 @@ import { AvayaAuraAdapter } from './relay/providers/avaya-aura.adapter';
         talkdesk: TalkdeskAdapter,
         axp: AxpAdapter,
         avayaAura: AvayaAuraAdapter,
-      ) => [genesys, nice, five9, talkdesk, axp, avayaAura],
-      inject: [GenesysCloudAdapter, NiceCxoneAdapter, Five9Adapter, TalkdeskAdapter, AxpAdapter, AvayaAuraAdapter],
+        natsAcd: NatsAcdAdapter,
+      ) => [genesys, nice, five9, talkdesk, axp, avayaAura, natsAcd],
+      inject: [GenesysCloudAdapter, NiceCxoneAdapter, Five9Adapter, TalkdeskAdapter, AxpAdapter, AvayaAuraAdapter, NatsAcdAdapter],
     },
     RelayAdapterRegistry,
     StreamingRelayService,

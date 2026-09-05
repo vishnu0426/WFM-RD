@@ -37,7 +37,9 @@ export type ConnectorSettingKey =
   /** `GenesysCloudHistoricalAdapter`'s own real, required query parameters: `{ queueIds: string[], metrics: string[], granularity?: string }` - see that adapter's own doc comment for the real Genesys Cloud Analytics API fields these map onto. */
   | 'genesysCloud'
   /** `Five9HistoricalAdapter`'s own real, required parameter: `{ folderName: string }` - the Five9 Reports Designer folder holding the report named by the historical import's own dataset key. */
-  | 'five9';
+  | 'five9'
+  /** `NatsAcdAdapter`'s own real, required topology for subscribing to a customer's on-prem NATS bus - see that adapter's own doc comment for why `useJetStream: true` requires `streamName`/`durableName`. Auth material (`authType`/token/user-pass/nkey/creds/TLS CA) is separate, Vault-backed credential material, never in this settings object. */
+  | 'onpremNats';
 
 type SettingValidator = (value: unknown, key: string) => void;
 
@@ -123,6 +125,38 @@ function five9Setting(value: unknown, key: string): void {
   }
 }
 
+const NATS_URL_PATTERN = /^(nats|tls):\/\/.+/;
+
+function onpremNatsSetting(value: unknown, key: string): void {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new InvalidConnectorSettingsError(`"${key}" must be an object.`);
+  }
+  const v = value as Record<string, unknown>;
+  if (!Array.isArray(v.natsUrls) || v.natsUrls.length === 0 || v.natsUrls.some((u) => typeof u !== 'string' || !NATS_URL_PATTERN.test(u))) {
+    throw new InvalidConnectorSettingsError(`"${key}.natsUrls" must be a non-empty array of "nats://" or "tls://" URLs.`);
+  }
+  if (!isNonEmptyString(v.subject)) {
+    throw new InvalidConnectorSettingsError(`"${key}.subject" must be a non-empty string.`);
+  }
+  if (v.queueGroup !== undefined && !isNonEmptyString(v.queueGroup)) {
+    throw new InvalidConnectorSettingsError(`"${key}.queueGroup" must be a non-empty string when set.`);
+  }
+  if (typeof v.useJetStream !== 'boolean') {
+    throw new InvalidConnectorSettingsError(`"${key}.useJetStream" must be a boolean.`);
+  }
+  if (v.useJetStream) {
+    if (!isNonEmptyString(v.streamName)) {
+      throw new InvalidConnectorSettingsError(`"${key}.streamName" is required (and must be a non-empty string) when useJetStream is true.`);
+    }
+    if (!isNonEmptyString(v.durableName)) {
+      throw new InvalidConnectorSettingsError(`"${key}.durableName" is required (and must be a non-empty string) when useJetStream is true.`);
+    }
+  }
+  if (v.ackWaitSeconds !== undefined && (typeof v.ackWaitSeconds !== 'number' || v.ackWaitSeconds <= 0)) {
+    throw new InvalidConnectorSettingsError(`"${key}.ackWaitSeconds" must be a positive number when set.`);
+  }
+}
+
 const CONNECTOR_SETTINGS_SCHEMA: Record<ConnectorSettingKey, SettingValidator> = {
   name: stringSetting(200),
   description: stringSetting(2000),
@@ -137,6 +171,7 @@ const CONNECTOR_SETTINGS_SCHEMA: Record<ConnectorSettingKey, SettingValidator> =
   historicalDatabaseSsl: booleanSetting,
   genesysCloud: genesysCloudSetting,
   five9: five9Setting,
+  onpremNats: onpremNatsSetting,
 };
 
 export const DEFAULT_REASON_CODE_SOURCE_FIELD = 'reasonCode';
