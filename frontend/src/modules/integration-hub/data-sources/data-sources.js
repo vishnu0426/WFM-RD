@@ -58,11 +58,11 @@ const SETTINGS_FIELDS = [
   { id: 'contactViewerServerName', label: 'Contact Viewer Server Name', type: 'text' },
   { id: 'contactViewerServerPort', label: 'Contact Viewer Server Port', type: 'number' },
   { id: 'contactViewerUrlOverride', label: 'Contact Viewer URL Override', type: 'text' },
-  { id: 'historicalDatabaseSsl', label: 'Require TLS for Historical Database Connection', type: 'checkbox' },
-  { id: 'historicalQueries', label: 'Historical Queries (JSON: { datasetKey: sqlTemplate }) — database (Postgres) provider uses "$1"/"$2" placeholders, mysql provider uses "?" for both — match the one this connector actually uses.', type: 'json', placeholder: '{\n  "my_dataset": "SELECT * FROM my_table WHERE ts >= $1 AND ts <= $2"\n}' },
-  { id: 'genesysCloud', label: 'Genesys Cloud Historical Settings (JSON) — genesys-cloud provider', type: 'json', placeholder: '{\n  "queueIds": ["<queue-guid>"],\n  "metrics": ["tHandle", "tWait", "tAbandon"],\n  "granularity": "PT30M"\n}' },
-  { id: 'five9', label: 'Five9 Historical Settings (JSON) — five9 provider', type: 'json', placeholder: '{\n  "folderName": "My Reports"\n}' },
-  { id: 'sftpCsv', label: 'SFTP/CSV Historical Settings (JSON: { datasetKey: { remoteDir, fileNamePattern, delimiter?, hasHeaderRow? } }) — sftp-csv provider. "{date}" in fileNamePattern is substituted per calendar day (YYYY-MM-DD).', type: 'json', placeholder: '{\n  "acd_events": {\n    "remoteDir": "/exports/acd_events",\n    "fileNamePattern": "acd_events_{date}.csv",\n    "hasHeaderRow": true\n  }\n}' },
+  { id: 'historicalDatabaseSsl', label: 'Require TLS for Historical Database Connection', type: 'checkbox', providers: ['database', 'mysql'] },
+  { id: 'historicalQueries', label: 'Historical Queries (JSON: { datasetKey: sqlTemplate }) — "$1"/"$2" placeholders for database (Postgres), "?" for mysql.', type: 'json', placeholder: '{\n  "my_dataset": "SELECT * FROM my_table WHERE ts >= $1 AND ts <= $2"\n}', providers: ['database', 'mysql'] },
+  { id: 'genesysCloud', label: 'Genesys Cloud Historical Settings (JSON)', type: 'json', placeholder: '{\n  "queueIds": ["<queue-guid>"],\n  "metrics": ["tHandle", "tWait", "tAbandon"],\n  "granularity": "PT30M"\n}', providers: ['genesys-cloud'] },
+  { id: 'five9', label: 'Five9 Historical Settings (JSON)', type: 'json', placeholder: '{\n  "folderName": "My Reports"\n}', providers: ['five9'] },
+  { id: 'sftpCsv', label: 'SFTP/CSV Historical Settings (JSON: { datasetKey: { remoteDir, fileNamePattern, delimiter?, hasHeaderRow? } }). "{date}" in fileNamePattern is substituted per calendar day (YYYY-MM-DD).', type: 'json', placeholder: '{\n  "acd_events": {\n    "remoteDir": "/exports/acd_events",\n    "fileNamePattern": "acd_events_{date}.csv",\n    "hasHeaderRow": true\n  }\n}', providers: ['sftp-csv'] },
 ];
 
 function loadConnectors(state) {
@@ -102,6 +102,11 @@ function emptyConnectorDraft() {
 
 function isNatsAcdDraft(d) {
   return d.connectorType === 'ACD' && d.provider.trim() === NATS_ACD_PROVIDER;
+}
+
+/** WFM/Timezone/Scorecards fields (no `providers` list) apply to every connector; a field naming specific `providers` only makes sense — and only renders/saves — for a connector actually using one of them. Without this, every connector's settings drawer showed every other provider's own fields (e.g. Five9's folderName box on a Talkdesk connector), which is exactly the "generic, not the real thing" shape this module otherwise avoids. */
+function settingsFieldsForProvider(provider) {
+  return SETTINGS_FIELDS.filter((f) => !f.providers || f.providers.includes(provider));
 }
 
 const NATS_SETTINGS_DRAFT_DEFAULTS = {
@@ -270,7 +275,7 @@ export function renderDrawer(state) {
       `Status: ${connector.status} · id ${connector.id}`,
       `
       <h4 style="margin:0 0 8px">General / WFM / Time Zone / Scorecards Settings</h4>
-      ${SETTINGS_FIELDS.map((f) => `
+      ${settingsFieldsForProvider(connector.provider).map((f) => `
         <div class="field" style="margin-top:10px">
           <label>${f.label}</label>
           ${f.type === 'checkbox'
@@ -405,7 +410,8 @@ export function handle(state, act, id, value) {
     const d = state.dsSettingsDraft;
     const settings = {};
     let jsonFieldError = null;
-    SETTINGS_FIELDS.forEach((f) => {
+    const connectorForSave = state.wf.connectors.rows.find((c) => c.id === state.dsDetailId);
+    settingsFieldsForProvider(connectorForSave ? connectorForSave.provider : '').forEach((f) => {
       if (f.type === 'checkbox') { settings[f.id] = !!d[f.id]; return; }
       if (f.type === 'number') { settings[f.id] = d[f.id] === '' ? null : Number(d[f.id]); return; }
       if (f.type === 'json') {
@@ -416,7 +422,6 @@ export function handle(state, act, id, value) {
       settings[f.id] = d[f.id] === '' ? null : d[f.id];
     });
     if (jsonFieldError) { toast(`"${jsonFieldError}" must be valid JSON.`); return true; }
-    const connectorForSave = state.wf.connectors.rows.find((c) => c.id === state.dsDetailId);
     if (connectorForSave && connectorForSave.provider === NATS_ACD_PROVIDER) {
       if (!d.onpremNatsSubject.trim()) { toast('Subject is required.'); return true; }
       const natsUrls = d.onpremNatsUrls.split('\n').map((u) => u.trim()).filter(Boolean);
