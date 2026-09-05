@@ -39,7 +39,9 @@ export type ConnectorSettingKey =
   /** `Five9HistoricalAdapter`'s own real, required parameter: `{ folderName: string }` - the Five9 Reports Designer folder holding the report named by the historical import's own dataset key. */
   | 'five9'
   /** `NatsAcdAdapter`'s own real, required topology for subscribing to a customer's on-prem NATS bus - see that adapter's own doc comment for why `useJetStream: true` requires `streamName`/`durableName`. Auth material (`authType`/token/user-pass/nkey/creds/TLS CA) is separate, Vault-backed credential material, never in this settings object. */
-  | 'onpremNats';
+  | 'onpremNats'
+  /** `SftpCsvHistoricalAdapter`'s own real, required per-dataset file pattern: `{ [datasetKey]: { remoteDir, fileNamePattern, delimiter?, hasHeaderRow? } }` - see that adapter's own doc comment for the "{date}" substitution and header-row conventions. Auth (host/port/username/password-or-privateKey) is separate, Vault-backed credential material. */
+  | 'sftpCsv';
 
 type SettingValidator = (value: unknown, key: string) => void;
 
@@ -157,6 +159,34 @@ function onpremNatsSetting(value: unknown, key: string): void {
   }
 }
 
+function sftpCsvSetting(value: unknown, key: string): void {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new InvalidConnectorSettingsError(`"${key}" must be an object of { datasetKey: { remoteDir, fileNamePattern, ... } }.`);
+  }
+  for (const [datasetKey, dataset] of Object.entries(value as Record<string, unknown>)) {
+    if (typeof dataset !== 'object' || dataset === null || Array.isArray(dataset)) {
+      throw new InvalidConnectorSettingsError(`"${key}.${datasetKey}" must be an object.`);
+    }
+    const d = dataset as Record<string, unknown>;
+    if (!isNonEmptyString(d.remoteDir)) {
+      throw new InvalidConnectorSettingsError(`"${key}.${datasetKey}.remoteDir" must be a non-empty string.`);
+    }
+    if (!isNonEmptyString(d.fileNamePattern)) {
+      throw new InvalidConnectorSettingsError(`"${key}.${datasetKey}.fileNamePattern" must be a non-empty string.`);
+    }
+    if (d.delimiter !== undefined && (typeof d.delimiter !== 'string' || d.delimiter.length !== 1)) {
+      throw new InvalidConnectorSettingsError(`"${key}.${datasetKey}.delimiter" must be a single character when set.`);
+    }
+    if (
+      d.hasHeaderRow !== undefined &&
+      typeof d.hasHeaderRow !== 'boolean' &&
+      !(Array.isArray(d.hasHeaderRow) && d.hasHeaderRow.every((c) => typeof c === 'string' && c.length > 0))
+    ) {
+      throw new InvalidConnectorSettingsError(`"${key}.${datasetKey}.hasHeaderRow" must be a boolean, or an array of column-name strings when the file has no header row.`);
+    }
+  }
+}
+
 const CONNECTOR_SETTINGS_SCHEMA: Record<ConnectorSettingKey, SettingValidator> = {
   name: stringSetting(200),
   description: stringSetting(2000),
@@ -172,6 +202,7 @@ const CONNECTOR_SETTINGS_SCHEMA: Record<ConnectorSettingKey, SettingValidator> =
   genesysCloud: genesysCloudSetting,
   five9: five9Setting,
   onpremNats: onpremNatsSetting,
+  sftpCsv: sftpCsvSetting,
 };
 
 export const DEFAULT_REASON_CODE_SOURCE_FIELD = 'reasonCode';
