@@ -141,6 +141,7 @@ export class SyncJobsService {
         params.push(delta.failed);
       }
       if (setClauses.length === 0) return;
+      setClauses.push('last_event_at = now()');
       params.push(jobId, tenantId);
       await manager.query(
         `UPDATE integration_hub.sync_job SET ${setClauses.join(', ')} WHERE id = $${params.length - 1} AND tenant_id = $${params.length}`,

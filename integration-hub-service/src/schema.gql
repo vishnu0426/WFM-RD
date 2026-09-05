@@ -165,6 +165,7 @@ type SyncJob {
   connectorId: ID!
   errorDetails: JSON
   id: ID!
+  lastEventAt: DateTime
   rateLimitedUntil: DateTime
   recordsConflicted: Float
   recordsFailed: Float!

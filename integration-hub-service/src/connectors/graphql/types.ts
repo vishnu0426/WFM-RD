@@ -129,6 +129,10 @@ export class SyncJobResult {
   /** §5a: set while this (still `RUNNING`) job is mid-retry in the reactive backoff loop — a live "currently throttled" signal, distinct from a merely slow sync. Only meaningful while `status === RUNNING`; a stale value on a terminal job is a historical artifact, not current state. */
   @Field(() => Date, { nullable: true })
   rateLimitedUntil!: Date | null;
+
+  /** When this job last actually processed an event (success or failure) — staleness, not true source-to-platform latency. Only meaningfully populated for `syncType: streaming` rows; see `SyncJobsService.incrementCounts`. */
+  @Field(() => Date, { nullable: true })
+  lastEventAt!: Date | null;
 }
 
 /**
@@ -325,6 +329,7 @@ export function toSyncJobResult(job: SyncJob): SyncJobResult {
     startedAt: job.startedAt,
     completedAt: job.completedAt,
     rateLimitedUntil: job.rateLimitedUntil,
+    lastEventAt: job.lastEventAt,
   };
 }
 

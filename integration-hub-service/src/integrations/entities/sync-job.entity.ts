@@ -57,6 +57,10 @@ export class SyncJob {
   @Column('timestamptz', { name: 'rate_limited_until', nullable: true })
   rateLimitedUntil!: Date | null;
 
+  /** When this platform last actually processed a streaming event for this job (success or failure) - set alongside `recordsProcessed`/`recordsFailed` in `SyncJobsService.incrementCounts`. Staleness ("time since last event"), not true source-to-platform latency - no origin timestamp is available at that call site. See migration `SyncJobLastEventAt1700010700000`'s own doc comment. */
+  @Column('timestamptz', { name: 'last_event_at', nullable: true })
+  lastEventAt!: Date | null;
+
   // ---------------------------------------------------------------------
   // WP5 (Historical Import/Backfill) - only meaningful/non-null for
   // `syncType: historical` rows (enforced by
