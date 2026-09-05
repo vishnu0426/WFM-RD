@@ -178,14 +178,154 @@ function renderServerAssociations(state, connectorId) {
   `;
 }
 
+/* Real, named credential (Vault-bound) and config (non-secret,
+   `additionalConfig` -> `connector.config`) fields per real, already-
+   implemented provider - pulled directly from each adapter's own
+   TypeScript credential/config interface (sync/relay/providers/*.ts,
+   sync/historical/providers/*.ts, sync/batch/providers/*.ts), not
+   guessed. Replaces one generic "Credentials (JSON)" textarea for every
+   provider with the actual fields each one's own adapter code reads.
+   Streaming and historical adapters for the "same" vendor use different
+   literal `provider` strings today (a pre-existing inconsistency - the
+   streaming registry keys on a human-readable name, the historical one
+   on kebab-case) - both are listed here as distinct, clearly-labeled
+   catalog entries rather than papered over, since creating one connector
+   only ever matches one of the two registries. */
+const PROVIDER_CATALOG = [
+  { value: 'workday', label: 'Workday — HRIS (Batch Sync)', connectorType: 'HRIS',
+    credentialFields: [{ id: 'accessToken', label: 'Access Token', type: 'password' }] },
+  { value: 'adp', label: 'ADP — Payroll (Batch Sync)', connectorType: 'PAYROLL',
+    credentialFields: [
+      { id: 'accessToken', label: 'Access Token', type: 'password' },
+      { id: 'clientCertPem', label: 'Client Certificate (PEM)', type: 'textarea' },
+      { id: 'clientKeyPem', label: 'Client Private Key (PEM)', type: 'textarea' },
+    ] },
+  { value: 'salesforce', label: 'Salesforce — CRM (Batch Sync)', connectorType: 'CRM',
+    credentialFields: [{ id: 'accessToken', label: 'Access Token', type: 'password' }] },
+  { value: 'sap-successfactors', label: 'SAP SuccessFactors — HRIS (Batch Sync)', connectorType: 'HRIS',
+    credentialFields: [{ id: 'accessToken', label: 'Access Token', type: 'password' }] },
+  { value: 'database', label: 'Database — Postgres (Historical Import)', connectorType: 'DATABASE',
+    credentialFields: [
+      { id: 'host', label: 'Host', type: 'text' },
+      { id: 'port', label: 'Port (default 5432)', type: 'number', optional: true },
+      { id: 'database', label: 'Database Name', type: 'text' },
+      { id: 'username', label: 'Username', type: 'text' },
+      { id: 'password', label: 'Password', type: 'password' },
+    ] },
+  { value: 'mysql', label: 'MySQL (Historical Import)', connectorType: 'DATABASE',
+    credentialFields: [
+      { id: 'host', label: 'Host', type: 'text' },
+      { id: 'port', label: 'Port (default 3306)', type: 'number', optional: true },
+      { id: 'database', label: 'Database Name', type: 'text' },
+      { id: 'username', label: 'Username', type: 'text' },
+      { id: 'password', label: 'Password', type: 'password' },
+    ] },
+  { value: 'sftp-csv', label: 'SFTP / CSV File Drop (Historical Import)', connectorType: 'DATABASE',
+    credentialFields: [
+      { id: 'host', label: 'Host', type: 'text' },
+      { id: 'port', label: 'Port (default 22)', type: 'number', optional: true },
+      { id: 'username', label: 'Username', type: 'text' },
+      { id: 'password', label: 'Password (leave blank if using a private key)', type: 'password', optional: true },
+      { id: 'privateKey', label: 'Private Key (leave blank if using a password)', type: 'textarea', optional: true },
+      { id: 'passphrase', label: 'Private Key Passphrase (optional)', type: 'password', optional: true },
+    ] },
+  { value: 'genesys-cloud', label: 'Genesys Cloud (Historical Import)', connectorType: 'ACD',
+    credentialFields: [
+      { id: 'region', label: 'Org Region (e.g. mypurecloud.com)', type: 'text' },
+      { id: 'clientId', label: 'Client ID', type: 'text' },
+      { id: 'clientSecret', label: 'Client Secret', type: 'password' },
+    ] },
+  { value: 'avaya-axp', label: 'Avaya Experience Platform (Historical Import)', connectorType: 'ACD',
+    credentialFields: [
+      { id: 'region', label: 'Region (e.g. use1, euw1)', type: 'text' },
+      { id: 'accountId', label: 'Account ID', type: 'text' },
+      { id: 'clientId', label: 'Client ID', type: 'text' },
+      { id: 'clientSecret', label: 'Client Secret', type: 'password' },
+    ] },
+  { value: 'talkdesk', label: 'Talkdesk (Historical Import)', connectorType: 'ACD',
+    credentialFields: [
+      { id: 'clientId', label: 'Client ID', type: 'text' },
+      { id: 'clientSecret', label: 'Client Secret', type: 'password' },
+      { id: 'tokenUrl', label: 'Token URL (from your Talkdesk admin settings)', type: 'text' },
+      { id: 'apiBaseUrl', label: 'API Base URL (from your Talkdesk admin settings)', type: 'text' },
+    ] },
+  { value: 'nice-cxone', label: 'NICE CXone (Historical Import)', connectorType: 'ACD',
+    credentialFields: [
+      { id: 'region', label: 'Region (e.g. na1, eu1)', type: 'text' },
+      { id: 'clientId', label: 'Client ID', type: 'text' },
+      { id: 'clientSecret', label: 'Client Secret', type: 'password' },
+      { id: 'apiVersion', label: 'API Version (optional, default 20.0)', type: 'text', optional: true },
+    ] },
+  { value: 'five9', label: 'Five9 (Historical Import)', connectorType: 'ACD',
+    credentialFields: [
+      { id: 'username', label: 'Username', type: 'text' },
+      { id: 'password', label: 'Password', type: 'password' },
+      { id: 'apiVersion', label: 'API Version (optional, default 9_5)', type: 'text', optional: true },
+    ] },
+  { value: 'Genesys Cloud', label: 'Genesys Cloud (Real-Time Streaming)', connectorType: 'ACD',
+    credentialFields: [
+      { id: 'clientId', label: 'Client ID', type: 'text' },
+      { id: 'clientSecret', label: 'Client Secret', type: 'password' },
+    ],
+    configFields: [
+      { id: 'genesysApiBaseUrl', label: 'API Base URL (e.g. https://api.mypurecloud.com)', type: 'text' },
+      { id: 'genesysUserIds', label: 'Genesys User IDs to monitor (comma-separated)', type: 'text', array: true },
+    ] },
+  { value: 'Avaya Aura Contact Center / CMS', label: 'Avaya Aura (Real-Time Streaming)', connectorType: 'ACD',
+    credentialFields: [{ id: 'securityToken', label: 'Security Token', type: 'password' }],
+    configFields: [
+      { id: 'aesHost', label: 'AES Host', type: 'text' },
+      { id: 'aesPort', label: 'AES Port', type: 'number' },
+      { id: 'monitoredDeviceIds', label: 'Device IDs to monitor (comma-separated)', type: 'text', array: true },
+    ] },
+  { value: 'NICE CXone', label: 'NICE CXone (Real-Time Streaming)', connectorType: 'ACD',
+    credentialFields: [
+      { id: 'username', label: 'Username (use with Password, or use Client ID/Secret instead)', type: 'text', optional: true },
+      { id: 'password', label: 'Password', type: 'password', optional: true },
+      { id: 'clientId', label: 'Client ID (use with Client Secret, or use Username/Password instead)', type: 'text', optional: true },
+      { id: 'clientSecret', label: 'Client Secret', type: 'password', optional: true },
+    ],
+    configFields: [
+      { id: 'niceApiBaseUrl', label: 'API Base URL', type: 'text' },
+      { id: 'niceAgentIds', label: 'Agent IDs to monitor (comma-separated)', type: 'text', array: true },
+    ] },
+  { value: 'Five9', label: 'Five9 (Real-Time Streaming)', connectorType: 'ACD',
+    credentialFields: [
+      { id: 'username', label: 'Username', type: 'text' },
+      { id: 'password', label: 'Password', type: 'password' },
+    ],
+    configFields: [{ id: 'five9ApiBaseUrl', label: 'API Base URL', type: 'text' }] },
+  { value: 'Talkdesk', label: 'Talkdesk (Real-Time Streaming)', connectorType: 'ACD',
+    credentialFields: [
+      { id: 'clientId', label: 'Client ID', type: 'text' },
+      { id: 'clientSecret', label: 'Client Secret', type: 'password' },
+    ],
+    configFields: [{ id: 'talkdeskApiBaseUrl', label: 'API Base URL', type: 'text' }] },
+  { value: 'Avaya Experience Platform', label: 'Avaya Experience Platform (Real-Time Streaming)', connectorType: 'ACD',
+    credentialFields: [
+      { id: 'clientId', label: 'Client ID', type: 'text' },
+      { id: 'clientSecret', label: 'Client Secret', type: 'password' },
+    ],
+    configFields: [
+      { id: 'axpApiBaseUrl', label: 'API Base URL', type: 'text' },
+      { id: 'axpAccountId', label: 'Account ID', type: 'text' },
+    ] },
+  { value: NATS_ACD_PROVIDER, label: 'On-Prem NATS ACD (Real-Time Streaming)', connectorType: 'ACD', special: 'nats' },
+  { value: '__custom__', label: 'Custom / Other (advanced — raw JSON credentials)', connectorType: null, special: 'custom' },
+];
+
+function providerCatalogEntry(providerValue) {
+  return PROVIDER_CATALOG.find((p) => p.value === providerValue) || null;
+}
+
 const LIST_QUERY = `query { connectors { id connectorType provider status lastSyncAt lastSyncStatus settings } }`;
 const CREATE_MUTATION = `mutation Create(
-  $connectorType: ConnectorType!, $provider: String!, $credentials: JSON,
+  $connectorType: ConnectorType!, $provider: String!, $credentials: JSON, $additionalConfig: JSON,
   $oauthClientId: String, $oauthClientSecret: String, $oauthAuthorizationEndpoint: String,
   $oauthTokenEndpoint: String, $oauthRedirectUri: String, $oauthScope: String
 ) {
   createConnector(
-    connectorType: $connectorType, provider: $provider, credentials: $credentials,
+    connectorType: $connectorType, provider: $provider, credentials: $credentials, additionalConfig: $additionalConfig,
     oauthClientId: $oauthClientId, oauthClientSecret: $oauthClientSecret,
     oauthAuthorizationEndpoint: $oauthAuthorizationEndpoint, oauthTokenEndpoint: $oauthTokenEndpoint,
     oauthRedirectUri: $oauthRedirectUri, oauthScope: $oauthScope
@@ -230,6 +370,9 @@ function emptyConnectorDraft() {
   return {
     connectorType: CONNECTOR_TYPES[0],
     provider: '',
+    customProvider: '',
+    credentialFieldValues: {},
+    configFieldValues: {},
     authMode: 'credentials',
     credentialsJson: '{\n  \n}',
     oauthClientId: '',
@@ -246,10 +389,6 @@ function emptyConnectorDraft() {
     natsCredsFile: '',
     natsTlsCaCert: '',
   };
-}
-
-function isNatsAcdDraft(d) {
-  return d.connectorType === 'ACD' && d.provider.trim() === NATS_ACD_PROVIDER;
 }
 
 /** WFM/Timezone/Scorecards fields (no `providers` list) apply to every connector; a field naming specific `providers` only makes sense — and only renders/saves — for a connector actually using one of them. Without this, every connector's settings drawer showed every other provider's own fields (e.g. Five9's folderName box on a Talkdesk connector), which is exactly the "generic, not the real thing" shape this module otherwise avoids. */
@@ -374,44 +513,71 @@ function natsAuthFieldsHtml(d) {
     </div>`;
 }
 
+function catalogFieldsHtml(fields, values, action) {
+  return fields.map((f) => `
+    <div class="field" style="margin-top:10px">
+      <label>${esc(f.label)}</label>
+      ${f.type === 'textarea'
+        ? `<textarea data-wf="${action}" data-id="${f.id}" rows="3" class="mono">${esc(values[f.id] || '')}</textarea>`
+        : `<input type="${f.type === 'number' ? 'number' : f.type === 'password' ? 'password' : 'text'}" data-wf="${action}" data-id="${f.id}" value="${esc(values[f.id] || '')}" />`}
+    </div>`).join('');
+}
+
 export function renderDrawer(state) {
   if (state.drawer === 'ds-connector') {
     const d = state.dsConnectorDraft;
     const saving = state.wf.saving.dsConnector;
-    const isNats = isNatsAcdDraft(d);
+    const entry = providerCatalogEntry(d.provider);
+    const isNats = entry && entry.special === 'nats';
+    const isCustom = entry && entry.special === 'custom';
     return drawerShell(
       'New Data Source',
-      'GraphQL: createConnector — exactly one of credentials or OAuth is required',
+      'GraphQL: createConnector — real, named fields per provider, not a generic credentials blob',
       `
       <div class="grid-2">
         <div class="field"><label>Type</label>
           <select data-wf="ds-connector-field" data-id="connectorType">${CONNECTOR_TYPES.map((t) => `<option value="${t}" ${d.connectorType === t ? 'selected' : ''}>${t}</option>`).join('')}</select>
         </div>
-        <div class="field"><label>Provider</label><input data-wf="ds-connector-field" data-id="provider" placeholder="e.g. workday, adp, salesforce, ${NATS_ACD_PROVIDER}" value="${esc(d.provider)}" /></div>
+        <div class="field"><label>Provider</label>
+          <select data-wf="ds-connector-field" data-id="provider">
+            <option value="" ${d.provider === '' ? 'selected' : ''}>Select a provider…</option>
+            ${PROVIDER_CATALOG.map((p) => `<option value="${esc(p.value)}" ${d.provider === p.value ? 'selected' : ''}>${esc(p.label)}</option>`).join('')}
+          </select>
+        </div>
       </div>
-      ${isNats ? `
+      ${isCustom ? `
+        <div class="field" style="margin-top:10px"><label>Provider Name (sent to the backend exactly as typed)</label>
+          <input data-wf="ds-connector-field" data-id="customProvider" placeholder="e.g. my-internal-system" value="${esc(d.customProvider)}" />
+        </div>
+        <div class="field" style="margin-top:10px"><label>Authentication</label>
+          <select data-wf="ds-connector-field" data-id="authMode">
+            <option value="credentials" ${d.authMode === 'credentials' ? 'selected' : ''}>API credentials</option>
+            <option value="oauth" ${d.authMode === 'oauth' ? 'selected' : ''}>OAuth</option>
+          </select>
+        </div>
+        ${d.authMode === 'credentials' ? `
+          <div class="field" style="margin-top:10px"><label>Credentials (JSON — no adapter exists yet for a custom provider, so no fixed field list either)</label>
+            <textarea data-wf="ds-connector-field" data-id="credentialsJson" rows="5" class="mono">${esc(d.credentialsJson)}</textarea>
+          </div>` : `
+          <div class="grid-2" style="margin-top:10px">
+            <div class="field"><label>OAuth client ID</label><input data-wf="ds-connector-field" data-id="oauthClientId" value="${esc(d.oauthClientId)}" /></div>
+            <div class="field"><label>OAuth client secret</label><input data-wf="ds-connector-field" data-id="oauthClientSecret" type="password" value="${esc(d.oauthClientSecret)}" /></div>
+          </div>
+          <div class="field" style="margin-top:10px"><label>Authorization endpoint</label><input data-wf="ds-connector-field" data-id="oauthAuthorizationEndpoint" value="${esc(d.oauthAuthorizationEndpoint)}" /></div>
+          <div class="field" style="margin-top:10px"><label>Token endpoint</label><input data-wf="ds-connector-field" data-id="oauthTokenEndpoint" value="${esc(d.oauthTokenEndpoint)}" /></div>
+          <div class="field" style="margin-top:10px"><label>Redirect URI</label><input data-wf="ds-connector-field" data-id="oauthRedirectUri" value="${esc(d.oauthRedirectUri)}" /></div>
+          <div class="field" style="margin-top:10px"><label>Scope</label><input data-wf="ds-connector-field" data-id="oauthScope" value="${esc(d.oauthScope)}" /></div>`}
+      ` : isNats ? `
         <p class="hint" style="margin-top:10px">On-prem customer ACD via NATS — real per-mechanism auth fields below, not a generic credentials blob.</p>
         ${natsAuthFieldsHtml(d)}
-      ` : `
-      <div class="field" style="margin-top:10px"><label>Authentication</label>
-        <select data-wf="ds-connector-field" data-id="authMode">
-          <option value="credentials" ${d.authMode === 'credentials' ? 'selected' : ''}>API credentials</option>
-          <option value="oauth" ${d.authMode === 'oauth' ? 'selected' : ''}>OAuth</option>
-        </select>
-      </div>
-      ${d.authMode === 'credentials' ? `
-        <div class="field" style="margin-top:10px"><label>Credentials (JSON — no fixed schema per provider)</label>
-          <textarea data-wf="ds-connector-field" data-id="credentialsJson" rows="5" class="mono">${esc(d.credentialsJson)}</textarea>
-        </div>` : `
-        <div class="grid-2" style="margin-top:10px">
-          <div class="field"><label>OAuth client ID</label><input data-wf="ds-connector-field" data-id="oauthClientId" value="${esc(d.oauthClientId)}" /></div>
-          <div class="field"><label>OAuth client secret</label><input data-wf="ds-connector-field" data-id="oauthClientSecret" type="password" value="${esc(d.oauthClientSecret)}" /></div>
-        </div>
-        <div class="field" style="margin-top:10px"><label>Authorization endpoint</label><input data-wf="ds-connector-field" data-id="oauthAuthorizationEndpoint" value="${esc(d.oauthAuthorizationEndpoint)}" /></div>
-        <div class="field" style="margin-top:10px"><label>Token endpoint</label><input data-wf="ds-connector-field" data-id="oauthTokenEndpoint" value="${esc(d.oauthTokenEndpoint)}" /></div>
-        <div class="field" style="margin-top:10px"><label>Redirect URI</label><input data-wf="ds-connector-field" data-id="oauthRedirectUri" value="${esc(d.oauthRedirectUri)}" /></div>
-        <div class="field" style="margin-top:10px"><label>Scope</label><input data-wf="ds-connector-field" data-id="oauthScope" value="${esc(d.oauthScope)}" /></div>`}
-      `}
+      ` : entry ? `
+        <h4 style="margin:16px 0 0">Credentials</h4>
+        ${catalogFieldsHtml(entry.credentialFields, d.credentialFieldValues, 'ds-credential-field')}
+        ${entry.configFields ? `
+          <h4 style="margin:16px 0 0">Connection Settings</h4>
+          ${catalogFieldsHtml(entry.configFields, d.configFieldValues, 'ds-config-field')}
+        ` : ''}
+      ` : ''}
       `,
       `<button class="btn" data-wf="close-drawer">Cancel</button>`,
       `<button class="btn btn-primary" data-wf="ds-connector-go" ${saving ? 'disabled' : ''}>${saving ? 'Creating…' : 'Create'}</button>`,
@@ -503,12 +669,28 @@ export function handle(state, act, id, value) {
     state.drawer = 'ds-connector';
     return true;
   }
-  if (act === 'ds-connector-field') { state.dsConnectorDraft[id] = value; return true; }
+  if (act === 'ds-connector-field') {
+    state.dsConnectorDraft[id] = value;
+    if (id === 'provider') {
+      const entry = providerCatalogEntry(value);
+      if (entry && entry.connectorType) state.dsConnectorDraft.connectorType = entry.connectorType;
+      state.dsConnectorDraft.credentialFieldValues = {};
+      state.dsConnectorDraft.configFieldValues = {};
+    }
+    return true;
+  }
+  if (act === 'ds-credential-field') { state.dsConnectorDraft.credentialFieldValues[id] = value; return true; }
+  if (act === 'ds-config-field') { state.dsConnectorDraft.configFieldValues[id] = value; return true; }
   if (act === 'ds-connector-go') {
     const d = state.dsConnectorDraft;
-    if (!d.provider.trim()) { toast('Provider is required.'); return true; }
-    const isNats = isNatsAcdDraft(d);
+    if (!d.provider) { toast('Select a provider.'); return true; }
+    const entry = providerCatalogEntry(d.provider);
+    const isNats = entry && entry.special === 'nats';
+    const isCustom = entry && entry.special === 'custom';
+    const providerValue = isCustom ? d.customProvider.trim() : d.provider;
+    if (!providerValue) { toast('Provider name is required.'); return true; }
     let credentials;
+    let additionalConfig;
     if (isNats) {
       if (d.natsAuthType === 'token' && !d.natsToken.trim()) { toast('Token is required.'); return true; }
       if (d.natsAuthType === 'userpass' && (!d.natsUser.trim() || !d.natsPass)) { toast('Username and password are required.'); return true; }
@@ -520,21 +702,52 @@ export function handle(state, act, id, value) {
       if (d.natsAuthType === 'nkey') credentials.nkeySeed = d.natsNkeySeed.trim();
       if (d.natsAuthType === 'creds') credentials.credsFile = d.natsCredsFile;
       if (d.natsTlsCaCert.trim()) credentials.tlsCaCert = d.natsTlsCaCert.trim();
-    } else if (d.authMode === 'credentials') {
-      try { credentials = JSON.parse(d.credentialsJson); } catch { toast('Credentials must be valid JSON.'); return true; }
+    } else if (isCustom) {
+      if (d.authMode === 'credentials') {
+        try { credentials = JSON.parse(d.credentialsJson); } catch { toast('Credentials must be valid JSON.'); return true; }
+      }
+    } else if (entry) {
+      credentials = {};
+      for (const f of entry.credentialFields) {
+        const v = d.credentialFieldValues[f.id];
+        if (v === undefined || v === '') continue;
+        credentials[f.id] = f.type === 'number' ? Number(v) : v;
+      }
+      for (const f of entry.credentialFields) {
+        if (!f.optional && (credentials[f.id] === undefined || credentials[f.id] === '')) {
+          toast(`"${f.label}" is required.`);
+          return true;
+        }
+      }
+      if (entry.configFields) {
+        additionalConfig = {};
+        for (const f of entry.configFields) {
+          const v = d.configFieldValues[f.id];
+          if (v === undefined || v === '') continue;
+          additionalConfig[f.id] = f.array ? v.split(',').map((s) => s.trim()).filter(Boolean) : (f.type === 'number' ? Number(v) : v);
+        }
+        for (const f of entry.configFields) {
+          const v = additionalConfig[f.id];
+          if (v === undefined || (Array.isArray(v) && v.length === 0)) {
+            toast(`"${f.label}" is required.`);
+            return true;
+          }
+        }
+      }
     }
     state.wf.saving.dsConnector = true;
     doRerender();
     Api.integrationHubGql(CREATE_MUTATION, {
       connectorType: d.connectorType,
-      provider: d.provider.trim(),
-      credentials: (isNats || d.authMode === 'credentials') ? credentials : undefined,
-      oauthClientId: (!isNats && d.authMode === 'oauth') ? d.oauthClientId.trim() || undefined : undefined,
-      oauthClientSecret: d.authMode === 'oauth' ? d.oauthClientSecret.trim() || undefined : undefined,
-      oauthAuthorizationEndpoint: d.authMode === 'oauth' ? d.oauthAuthorizationEndpoint.trim() || undefined : undefined,
-      oauthTokenEndpoint: d.authMode === 'oauth' ? d.oauthTokenEndpoint.trim() || undefined : undefined,
-      oauthRedirectUri: d.authMode === 'oauth' ? d.oauthRedirectUri.trim() || undefined : undefined,
-      oauthScope: d.authMode === 'oauth' ? d.oauthScope.trim() || undefined : undefined,
+      provider: providerValue,
+      credentials: (isNats || entry) ? credentials : (d.authMode === 'credentials' ? credentials : undefined),
+      additionalConfig,
+      oauthClientId: (isCustom && d.authMode === 'oauth') ? d.oauthClientId.trim() || undefined : undefined,
+      oauthClientSecret: (isCustom && d.authMode === 'oauth') ? d.oauthClientSecret.trim() || undefined : undefined,
+      oauthAuthorizationEndpoint: (isCustom && d.authMode === 'oauth') ? d.oauthAuthorizationEndpoint.trim() || undefined : undefined,
+      oauthTokenEndpoint: (isCustom && d.authMode === 'oauth') ? d.oauthTokenEndpoint.trim() || undefined : undefined,
+      oauthRedirectUri: (isCustom && d.authMode === 'oauth') ? d.oauthRedirectUri.trim() || undefined : undefined,
+      oauthScope: (isCustom && d.authMode === 'oauth') ? d.oauthScope.trim() || undefined : undefined,
     })
       .then((data) => {
         state.wf.saving.dsConnector = false;
