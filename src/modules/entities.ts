@@ -59,6 +59,8 @@ import { WorkRuleAssignment } from './work-rule/entities/work-rule-assignment.en
 import { EmployeeSchedulePreference } from './schedule-preference/entities/employee-schedule-preference.entity';
 import { EmployeeInteraction } from './employee-interaction/entities/employee-interaction.entity';
 import { OrgUnitInteractionSettings } from './employee-interaction/entities/org-unit-interaction-settings.entity';
+import { PlatformSettings } from './platform-settings/entities/platform-settings.entity';
+import { PlatformFeatureFlagDefault } from './platform-settings/entities/platform-feature-flag-default.entity';
 
 /**
  * Single source of truth for "every entity in this module," consumed by
@@ -113,6 +115,8 @@ export const entities = [
   EmployeeSchedulePreference,
   EmployeeInteraction,
   OrgUnitInteractionSettings,
+  PlatformSettings,
+  PlatformFeatureFlagDefault,
 ];
 
 export {
@@ -163,4 +167,6 @@ export {
   EmployeeSchedulePreference,
   EmployeeInteraction,
   OrgUnitInteractionSettings,
+  PlatformSettings,
+  PlatformFeatureFlagDefault,
 };

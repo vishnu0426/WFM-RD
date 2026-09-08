@@ -90,7 +90,10 @@ export const Api = (() => {
   function normalizeError(status, body) {
     if (body && typeof body === 'object') {
       if (body.error && typeof body.error === 'object' && 'code' in body.error) {
-        return { status, code: body.error.code, message: body.error.message || 'Request failed.' };
+        // `details` (e.g. PLATFORM_SECURITY_BASELINE_VIOLATION's `{violations: [...]}`)
+        // passes through unchanged when present — every caller that only
+        // reads `.message`/`.code` today is unaffected by this addition.
+        return { status, code: body.error.code, message: body.error.message || 'Request failed.', details: body.error.details ?? null };
       }
       if (typeof body.error === 'string' && 'error_description' in body) {
         return { status, code: body.error, message: body.error_description || body.error };

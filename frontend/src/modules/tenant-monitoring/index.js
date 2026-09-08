@@ -9,6 +9,9 @@ import * as AllTenants from './all-tenants/all-tenants.js';
 import * as OnboardingFunnel from './onboarding-funnel/onboarding-funnel.js';
 import * as TenantHealth from './tenant-health/tenant-health.js';
 import * as FeatureFlags from './feature-flags/feature-flags.js';
+import * as SystemConfig from './system-config/system-config.js';
+import * as PlatformSettings from './platform-settings/platform-settings.js';
+import * as AppMonitoring from './app-monitoring/app-monitoring.js';
 
 export { NAV, FIRST, GROUP_OF, LEAF_SCREEN };
 
@@ -17,6 +20,9 @@ const TABS = {
   'tm-onboarding-funnel': OnboardingFunnel,
   'tm-health': TenantHealth,
   'tm-feature-flags': FeatureFlags,
+  'tm-system-config': SystemConfig,
+  'tm-platform-settings': PlatformSettings,
+  'tm-app-monitoring': AppMonitoring,
 };
 
 export function render(state) {

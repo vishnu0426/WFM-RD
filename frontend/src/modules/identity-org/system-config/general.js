@@ -10,6 +10,22 @@ import { toast } from '../../../app/toast.js';
 import { pageHead, sec } from '../shared/ui.js';
 import { loadSettings } from '../shared/loaders.js';
 
+/* The real IANA time zone database, straight from the browser's own ICU
+   data (~420 zones) — not a hand-maintained list. Falls back to a small
+   curated set only if the runtime genuinely lacks Intl.supportedValuesOf
+   (very old browsers). */
+const TIMEZONES = (() => {
+  try {
+    return Intl.supportedValuesOf('timeZone');
+  } catch {
+    return [
+      'UTC', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
+      'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'Asia/Kolkata', 'Asia/Tokyo',
+      'Asia/Shanghai', 'Asia/Singapore', 'Australia/Sydney',
+    ];
+  }
+})();
+
 function emptyDraft(s) {
   return { timezone: s.timezone || '', locale: s.locale || '', brandLogoUrl: s.brandLogoUrl || '' };
 }
@@ -30,10 +46,15 @@ export function render(state) {
       <button class="btn btn-primary" data-wf="sc-general-save" ${dirty && !saving ? '' : 'disabled'}>${saving ? 'Saving…' : 'Save'}</button>`)}
     ${sec('Display defaults', `
       <p class="hint" style="margin:0 0 10px">Timezone and locale are saved here but not yet consumed by any WFM computation — Calendar/Scheduling use each organization unit's own timezone instead (Organization → Hierarchy). This just controls what's displayed as this tenant's nominal default.</p>
-      <div class="field"><label>Timezone</label><input data-wf="sc-general-field" data-id="timezone" placeholder="e.g. America/New_York" value="${esc(d.timezone)}" /></div>
+      <div class="field"><label>Timezone</label>
+        <select data-wf="sc-general-field" data-id="timezone">
+          <option value="">—</option>
+          ${TIMEZONES.map((tz) => `<option value="${tz}" ${d.timezone === tz ? 'selected' : ''}>${tz}</option>`).join('')}
+        </select>
+      </div>
       <div class="field" style="margin-top:10px"><label>Locale</label><input data-wf="sc-general-field" data-id="locale" placeholder="e.g. en-US" value="${esc(d.locale)}" /></div>
       <div class="field" style="margin-top:10px"><label>Brand logo URL</label><input data-wf="sc-general-field" data-id="brandLogoUrl" placeholder="https://…" value="${esc(d.brandLogoUrl)}" /></div>
-    `, `<span class="meta">GET/PUT /v1/tenant-settings/general</span>`)}`;
+    `)}`;
 }
 
 export function handle(state, act, id, value) {

@@ -433,6 +433,11 @@ function providerCatalogEntry(providerValue) {
   return PROVIDER_CATALOG.find((p) => p.value === providerValue) || null;
 }
 
+/** Only providers real for the selected Type, plus "Custom / Other" (connectorType: null) which applies to any type — avoids a mixed list showing e.g. Workday (HRIS) while Type is set to ACD. */
+function providersForType(connectorType) {
+  return PROVIDER_CATALOG.filter((p) => p.connectorType === connectorType || p.connectorType === null);
+}
+
 const LIST_QUERY = `query { connectors { id connectorType provider status lastSyncAt lastSyncStatus settings } }`;
 const CREATE_MUTATION = `mutation Create(
   $connectorType: ConnectorType!, $provider: String!, $credentials: JSON, $additionalConfig: JSON, $settings: JSON,
@@ -670,7 +675,7 @@ export function renderDrawer(state) {
         <div class="field"><label>Provider</label>
           <select data-wf="ds-connector-field" data-id="provider">
             <option value="" ${d.provider === '' ? 'selected' : ''}>Select a provider…</option>
-            ${PROVIDER_CATALOG.map((p) => `<option value="${esc(p.value)}" ${d.provider === p.value ? 'selected' : ''}>${esc(p.label)}</option>`).join('')}
+            ${providersForType(d.connectorType).map((p) => `<option value="${esc(p.value)}" ${d.provider === p.value ? 'selected' : ''}>${esc(p.label)}</option>`).join('')}
           </select>
         </div>
       </div>
@@ -768,6 +773,15 @@ export function handle(state, act, id, value) {
     if (id === 'provider') {
       const entry = providerCatalogEntry(value);
       if (entry && entry.connectorType) state.dsConnectorDraft.connectorType = entry.connectorType;
+      state.dsConnectorDraft.credentialFieldValues = {};
+      state.dsConnectorDraft.configFieldValues = {};
+    }
+    if (id === 'connectorType') {
+      // Type changed directly (not as a side effect of picking a provider
+      // above) — the previously-selected provider may no longer be one of
+      // providersForType(value)'s options, so clear it rather than leave a
+      // stale selection the dropdown can no longer actually show.
+      state.dsConnectorDraft.provider = '';
       state.dsConnectorDraft.credentialFieldValues = {};
       state.dsConnectorDraft.configFieldValues = {};
     }

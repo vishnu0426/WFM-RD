@@ -4,12 +4,21 @@
    controller.ts), create a new one, and walk it through onboarding.
 
    The tenant detail drawer is an accordion checklist — Company Information
-   / Primary Admin / Organization / Security / Analytics — where each
+   / Primary Admin / Organization / WFM Configuration / General / Security /
+   Email / Notifications / Advanced / Data Sources / Analytics — where each
    panel's ✓/○ status is derived from real data on every render (tenant
    status, a live org-units-exist check, the health rollup's ssoConfigured
-   field), never a stored "onboarding progress" flag. Security is
-   read-only: SSO/security policy is the tenant's own admin's call, not
-   something a platform admin sets on their behalf.
+   field), never a stored "onboarding progress" flag.
+
+   General/Security/Email/Notifications/Advanced are cross-tenant writes
+   through TenantConfigAdminController (src/modules/tenant/rest/
+   tenant-config-admin.controller.ts, GET/PUT/POST /v1/tenants/:id/config/*)
+   — a platform_admin acting on a tenant that may not have a logged-in admin
+   yet to configure it themselves. Same underlying TenantSettings/Policy/
+   NotificationRule rows the tenant's own /v1/tenant-settings and /v1/policies
+   self-service routes read and write; this is a second entry point onto the
+   same data, not a shadow copy. SSO/Identity-Providers full CRUD and
+   Retention are deliberately not here — see this round's plan for why.
 
    The Onboarding Funnel / Tenant Health tabs are read-only analytics views
    sourced from a nightly-refreshed rollup; this screen is the live,
@@ -28,7 +37,7 @@
 import { esc, errMsg } from '../../../core/dom.js';
 import { doRerender } from '../../../app/rerender.js';
 import { toast } from '../../../app/toast.js';
-import { pageHead, empty, fmtDt, drawerShell } from '../../identity-org/shared/ui.js';
+import { pageHead, sec, empty, fmtDt, drawerShell } from '../../identity-org/shared/ui.js';
 import { tenantStatusBadge } from '../tenant-status-badge.js';
 import { COUNTRIES, CURRENCIES, LANGUAGES, INDUSTRIES, DATA_RESIDENCY_REGIONS } from '../reference-data.js';
 import * as TenantMonitoringApi from '../api.js';
@@ -41,6 +50,29 @@ function selectOptions(pairs, selectedValue, includeBlank) {
 const TIERS = ['smb', 'enterprise', 'bpo'];
 const ORG_UNIT_TYPES = ['business_unit', 'department', 'site', 'team'];
 const WEEK_DAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+
+/* The real IANA time zone database, straight from the browser's own ICU
+   data — same source frontend/src/modules/identity-org/system-config/
+   general.js's own Timezone field uses; duplicated rather than imported
+   since that's an ambient-tenant module with a different calling
+   convention (see the Platform Admin doc comment above). */
+const TIMEZONES = (() => {
+  try {
+    return Intl.supportedValuesOf('timeZone');
+  } catch {
+    return [
+      'UTC', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
+      'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'Asia/Kolkata', 'Asia/Tokyo',
+      'Asia/Shanghai', 'Asia/Singapore', 'Australia/Sydney',
+    ];
+  }
+})();
+
+const AUTH_METHODS = [
+  { id: 'pwd', label: 'Password' },
+  { id: 'webauthn', label: 'WebAuthn (security key / platform authenticator)' },
+];
+const NOTIF_CHANNELS = ['email', 'sms', 'push', 'in_app'];
 
 async function loadAllTenants(state) {
   state.wf.allTenants = { loading: true };
@@ -110,6 +142,106 @@ async function loadConnectorStatus(state, id) {
     state.wf.connectorStatus[id] = await TenantMonitoringApi.getConnectorStatus(id);
   } catch (err) {
     state.wf.connectorStatus[id] = { error: errMsg(err) };
+  }
+  doRerender();
+}
+
+/* Platform Admin cross-tenant System Configuration — General/Security/
+   Email share ONE underlying TenantSettingsView (same GET body from any of
+   the three routes), so one cache serves all three panels. Policy-backed
+   panels (auth method / access restriction / system limits / maintenance)
+   each hit GET /v1/tenants/:id/config/:policyType, which returns the single
+   active Policy row or null directly — NOT the array the tenant's own
+   GET /v1/policies?policyType=X returns, so no rows.find() here. */
+async function loadTenantConfigSettings(state, id) {
+  state.wf.tenantConfigSettings = state.wf.tenantConfigSettings || {};
+  state.wf.tenantConfigSettings[id] = { loading: true };
+  doRerender();
+  try {
+    state.wf.tenantConfigSettings[id] = { settings: await TenantMonitoringApi.getTenantConfigGeneral(id) };
+  } catch (err) {
+    state.wf.tenantConfigSettings[id] = { error: errMsg(err) };
+  }
+  doRerender();
+}
+
+async function loadTenantConfigAuthPolicy(state, id) {
+  state.wf.tenantConfigAuthPolicy = state.wf.tenantConfigAuthPolicy || {};
+  state.wf.tenantConfigAuthPolicy[id] = { loading: true };
+  doRerender();
+  try {
+    const active = await TenantMonitoringApi.getTenantConfigPolicy(id, 'auth_method_policy');
+    state.wf.tenantConfigAuthPolicy[id] = {
+      policyGroupId: active ? active.policyGroupId : null,
+      requiredMethods: active ? active.definition.requiredMethods || [] : [],
+      allowedMethods: active ? active.definition.allowedMethods || ['pwd', 'webauthn'] : ['pwd', 'webauthn'],
+    };
+  } catch (err) {
+    state.wf.tenantConfigAuthPolicy[id] = { error: errMsg(err) };
+  }
+  doRerender();
+}
+
+async function loadTenantConfigAccessPolicy(state, id) {
+  state.wf.tenantConfigAccessPolicy = state.wf.tenantConfigAccessPolicy || {};
+  state.wf.tenantConfigAccessPolicy[id] = { loading: true };
+  doRerender();
+  try {
+    const active = await TenantMonitoringApi.getTenantConfigPolicy(id, 'access_restriction_policy');
+    state.wf.tenantConfigAccessPolicy[id] = {
+      policyGroupId: active ? active.policyGroupId : null,
+      ipAllowlist: active ? (active.definition.ipAllowlist || []).join('\n') : '',
+      allowedEmailDomains: active ? (active.definition.allowedEmailDomains || []).join('\n') : '',
+    };
+  } catch (err) {
+    state.wf.tenantConfigAccessPolicy[id] = { error: errMsg(err) };
+  }
+  doRerender();
+}
+
+async function loadTenantConfigNotifRules(state, id) {
+  state.wf.tenantConfigNotifRules = state.wf.tenantConfigNotifRules || {};
+  state.wf.tenantConfigNotifRules[id] = { loading: true };
+  doRerender();
+  try {
+    state.wf.tenantConfigNotifRules[id] = { rows: await TenantMonitoringApi.listTenantConfigNotificationRules(id) };
+  } catch (err) {
+    state.wf.tenantConfigNotifRules[id] = { error: errMsg(err) };
+  }
+  doRerender();
+}
+
+async function loadTenantConfigLimitsPolicy(state, id) {
+  state.wf.tenantConfigLimitsPolicy = state.wf.tenantConfigLimitsPolicy || {};
+  state.wf.tenantConfigLimitsPolicy[id] = { loading: true };
+  doRerender();
+  try {
+    const active = await TenantMonitoringApi.getTenantConfigPolicy(id, 'system_limits');
+    state.wf.tenantConfigLimitsPolicy[id] = {
+      policyGroupId: active ? active.policyGroupId : null,
+      maxUsers: active && active.definition.maxUsers != null ? String(active.definition.maxUsers) : '',
+      maxEmployees: active && active.definition.maxEmployees != null ? String(active.definition.maxEmployees) : '',
+      maxOrgUnits: active && active.definition.maxOrgUnits != null ? String(active.definition.maxOrgUnits) : '',
+    };
+  } catch (err) {
+    state.wf.tenantConfigLimitsPolicy[id] = { error: errMsg(err) };
+  }
+  doRerender();
+}
+
+async function loadTenantConfigMaintenancePolicy(state, id) {
+  state.wf.tenantConfigMaintenancePolicy = state.wf.tenantConfigMaintenancePolicy || {};
+  state.wf.tenantConfigMaintenancePolicy[id] = { loading: true };
+  doRerender();
+  try {
+    const active = await TenantMonitoringApi.getTenantConfigPolicy(id, 'maintenance_mode');
+    state.wf.tenantConfigMaintenancePolicy[id] = {
+      policyGroupId: active ? active.policyGroupId : null,
+      enabled: active ? !!active.definition.enabled : false,
+      message: active ? active.definition.message || '' : '',
+    };
+  } catch (err) {
+    state.wf.tenantConfigMaintenancePolicy[id] = { error: errMsg(err) };
   }
   doRerender();
 }
@@ -378,11 +510,227 @@ function orgPanel(state, id, orgStatus) {
     </div>`;
 }
 
-function securityPanel(state, id, healthLoading, healthRow) {
-  if (healthLoading) return `<div class="skel" style="height:30px"></div>`;
-  return healthRow?.ssoConfigured
-    ? `<p>SSO/SCIM is configured for this tenant.</p>`
-    : `<p class="muted">Not yet configured — the tenant's own admin configures SSO after logging in.</p>`;
+function emptyTcGeneralDraft(s) {
+  return { timezone: s.timezone || '', locale: s.locale || '', brandLogoUrl: s.brandLogoUrl || '' };
+}
+
+function generalConfigPanel(state, id, cfgStatus) {
+  if (!cfgStatus || cfgStatus.loading) return `<div class="skel" style="height:60px"></div>`;
+  if (cfgStatus.error) return `<p class="muted">${esc(cfgStatus.error)}</p>`;
+  const s = cfgStatus.settings;
+  if (!state.tcGeneralDraft) state.tcGeneralDraft = emptyTcGeneralDraft(s);
+  const d = state.tcGeneralDraft;
+  const dirty = JSON.stringify(d) !== JSON.stringify(emptyTcGeneralDraft(s));
+  const saving = state.wf.saving?.tcGeneral;
+  return `
+    <div class="field"><label>Timezone</label>
+      <select data-wf="tc-general-field" data-id="timezone">
+        <option value="">—</option>
+        ${TIMEZONES.map((tz) => `<option value="${tz}" ${d.timezone === tz ? 'selected' : ''}>${tz}</option>`).join('')}
+      </select>
+    </div>
+    <div class="field" style="margin-top:10px"><label>Locale</label><input data-wf="tc-general-field" data-id="locale" placeholder="e.g. en-US" value="${esc(d.locale)}" /></div>
+    <div class="field" style="margin-top:10px"><label>Brand logo URL</label><input data-wf="tc-general-field" data-id="brandLogoUrl" placeholder="https://…" value="${esc(d.brandLogoUrl)}" /></div>
+    <div class="actions" style="margin-top:10px">
+      <button class="btn" data-act="tc-general-revert" data-id="${id}" ${dirty ? '' : 'disabled'}>Revert</button>
+      <button class="btn btn-primary" data-act="tc-general-save" data-id="${id}" ${dirty && !saving ? '' : 'disabled'}>${saving ? 'Saving…' : 'Save'}</button>
+    </div>`;
+}
+
+function emptyTcSecurityDraft(s) {
+  return {
+    passwordMinLength: s.passwordMinLength,
+    passwordRequireUppercase: s.passwordRequireUppercase,
+    passwordRequireNumber: s.passwordRequireNumber,
+    passwordRequireSymbol: s.passwordRequireSymbol,
+    passwordExpiryDays: s.passwordExpiryDays == null ? '' : String(s.passwordExpiryDays),
+  };
+}
+
+function tcPasswordPolicyCard(state, id, s) {
+  if (!state.tcSecurityDraft) state.tcSecurityDraft = emptyTcSecurityDraft(s);
+  const d = state.tcSecurityDraft;
+  const dirty = JSON.stringify(d) !== JSON.stringify(emptyTcSecurityDraft(s));
+  const saving = state.wf.saving?.tcSecurity;
+  return sec('Password Policy', `
+    <div class="grid-2">
+      <div class="field"><label>Minimum length</label><input data-wf="tc-sec-field" data-id="passwordMinLength" type="number" min="8" max="128" value="${d.passwordMinLength}" /></div>
+      <div class="field"><label>Expires after (days, blank = never)</label><input data-wf="tc-sec-field" data-id="passwordExpiryDays" type="number" min="1" value="${esc(d.passwordExpiryDays)}" /></div>
+    </div>
+    <div class="field" style="margin-top:10px">
+      <label><input type="checkbox" data-wf="tc-sec-toggle" data-id="passwordRequireUppercase" ${d.passwordRequireUppercase ? 'checked' : ''} /> Require an uppercase letter</label><br/>
+      <label><input type="checkbox" data-wf="tc-sec-toggle" data-id="passwordRequireNumber" ${d.passwordRequireNumber ? 'checked' : ''} /> Require a number</label><br/>
+      <label><input type="checkbox" data-wf="tc-sec-toggle" data-id="passwordRequireSymbol" ${d.passwordRequireSymbol ? 'checked' : ''} /> Require a symbol</label>
+    </div>
+    <div class="actions" style="margin-top:10px">
+      <button class="btn" data-act="tc-sec-revert" data-id="${id}" ${dirty ? '' : 'disabled'}>Revert</button>
+      <button class="btn btn-primary" data-act="tc-sec-save" data-id="${id}" ${dirty && !saving ? '' : 'disabled'}>${saving ? 'Saving…' : 'Save'}</button>
+    </div>
+  `);
+}
+
+/* Each checkbox carries its scope ("allowed"/"required") as its own
+   `value` attribute, read back via the change event's value param — NOT
+   via a data-scope dataset attribute matched against that same value.
+   (The tenant-facing sc-authpolicy-toggle in identity-org/system-config/
+   security.js does the latter, but neither app/shell.js's nor
+   app/platform-admin-shell.js's change listener ever reads dataset.scope —
+   only t.value — so an un-valued checkbox's value defaults to "on" and
+   that match can never succeed. Flagged separately; not fixed here since
+   it's a different module, out of this round's scope.) */
+function tcAuthMethodCard(state, id, ap) {
+  if (!ap || ap.loading) return sec('Required Authentication Method', `<div class="skel" style="height:40px"></div>`, '');
+  if (ap.error) return sec('Required Authentication Method', `<p class="muted">${esc(ap.error)}</p>`, '');
+  const d = state.tcAuthPolicyDraft || { requiredMethods: [...ap.requiredMethods], allowedMethods: [...ap.allowedMethods] };
+  const dirty = JSON.stringify({ requiredMethods: d.requiredMethods, allowedMethods: d.allowedMethods }) !==
+    JSON.stringify({ requiredMethods: ap.requiredMethods, allowedMethods: ap.allowedMethods });
+  const saving = state.wf.saving?.tcAuthPolicy;
+  return sec('Required Authentication Method', `
+    <p class="hint" style="margin:0 0 10px">If "Required" is empty, any allowed method is accepted at login. If set, a login must use one of the required methods, even if others are also allowed.</p>
+    <table class="data"><thead><tr><th>Method</th><th>Allowed</th><th>Required</th></tr></thead>
+    <tbody>${AUTH_METHODS.map((m) => `<tr>
+      <td>${esc(m.label)}</td>
+      <td><input type="checkbox" data-wf="tc-authpolicy-toggle" data-id="${m.id}" value="allowed" ${d.allowedMethods.includes(m.id) ? 'checked' : ''} /></td>
+      <td><input type="checkbox" data-wf="tc-authpolicy-toggle" data-id="${m.id}" value="required" ${d.requiredMethods.includes(m.id) ? 'checked' : ''} ${d.allowedMethods.includes(m.id) ? '' : 'disabled'} /></td>
+    </tr>`).join('')}</tbody></table>
+    <div class="actions" style="margin-top:10px">
+      <button class="btn" data-act="tc-authpolicy-revert" data-id="${id}" ${dirty ? '' : 'disabled'}>Revert</button>
+      <button class="btn btn-primary" data-act="tc-authpolicy-save" data-id="${id}" ${dirty && !saving ? '' : 'disabled'}>${saving ? 'Saving…' : 'Save'}</button>
+    </div>
+  `);
+}
+
+function tcAccessRestrictionCard(state, id, ap) {
+  if (!ap || ap.loading) return sec('Access Restrictions', `<div class="skel" style="height:40px"></div>`, '');
+  if (ap.error) return sec('Access Restrictions', `<p class="muted">${esc(ap.error)}</p>`, '');
+  const d = state.tcAccessDraft || { ipAllowlist: ap.ipAllowlist, allowedEmailDomains: ap.allowedEmailDomains };
+  const dirty = d.ipAllowlist !== ap.ipAllowlist || d.allowedEmailDomains !== ap.allowedEmailDomains;
+  const saving = state.wf.saving?.tcAccess;
+  return sec('Access Restrictions', `
+    <p class="hint" style="margin:0 0 10px">One entry per line. Leave both blank to allow any IP/domain (no restriction). IP entries are either an exact address or a whole-octet prefix ending in "." (e.g. "10.0.") — not full CIDR notation.</p>
+    <div class="grid-2">
+      <div class="field"><label>IP allowlist</label><textarea data-wf="tc-access-field" data-id="ipAllowlist" rows="4" placeholder="203.0.113.4&#10;10.0.">${esc(d.ipAllowlist)}</textarea></div>
+      <div class="field"><label>Allowed email domains</label><textarea data-wf="tc-access-field" data-id="allowedEmailDomains" rows="4" placeholder="acme-demo.example">${esc(d.allowedEmailDomains)}</textarea></div>
+    </div>
+    <div class="actions" style="margin-top:10px">
+      <button class="btn" data-act="tc-access-revert" data-id="${id}" ${dirty ? '' : 'disabled'}>Revert</button>
+      <button class="btn btn-primary" data-act="tc-access-save" data-id="${id}" ${dirty && !saving ? '' : 'disabled'}>${saving ? 'Saving…' : 'Save'}</button>
+    </div>
+  `);
+}
+
+function securityConfigPanel(state, id, cfgStatus, authPolicyStatus, accessPolicyStatus, healthRow) {
+  if (!cfgStatus || cfgStatus.loading) return `<div class="skel" style="height:60px"></div>`;
+  if (cfgStatus.error) return `<p class="muted">${esc(cfgStatus.error)}</p>`;
+  const ssoHint = healthRow?.ssoConfigured
+    ? `<p class="hint" style="margin:0 0 10px">SSO/SCIM is also configured for this tenant (set by its own admin — not editable here).</p>`
+    : '';
+  return ssoHint + tcPasswordPolicyCard(state, id, cfgStatus.settings) + tcAuthMethodCard(state, id, authPolicyStatus) + tcAccessRestrictionCard(state, id, accessPolicyStatus);
+}
+
+function emptyTcEmailDraft(s) {
+  return {
+    smtpHost: s.smtpHost || '',
+    smtpPort: s.smtpPort == null ? '' : String(s.smtpPort),
+    smtpUsername: s.smtpUsername || '',
+    smtpPassword: '',
+    smtpFromAddress: s.smtpFromAddress || '',
+    smtpUseTls: s.smtpUseTls,
+  };
+}
+
+function emailConfigPanel(state, id, cfgStatus) {
+  if (!cfgStatus || cfgStatus.loading) return `<div class="skel" style="height:60px"></div>`;
+  if (cfgStatus.error) return `<p class="muted">${esc(cfgStatus.error)}</p>`;
+  const s = cfgStatus.settings;
+  if (!state.tcEmailDraft) state.tcEmailDraft = emptyTcEmailDraft(s);
+  const d = state.tcEmailDraft;
+  const dirty = JSON.stringify(d) !== JSON.stringify(emptyTcEmailDraft(s));
+  const saving = state.wf.saving?.tcEmail;
+  const testing = state.wf.saving?.tcEmailTest;
+  const testResult = state.tcEmailTestResult;
+  return `
+    ${testResult ? `<p style="margin:0 0 10px">${esc(testResult.message)}</p>` : ''}
+    <div class="grid-2">
+      <div class="field"><label>Host</label><input data-wf="tc-email-field" data-id="smtpHost" placeholder="smtp.example.com" value="${esc(d.smtpHost)}" /></div>
+      <div class="field"><label>Port</label><input data-wf="tc-email-field" data-id="smtpPort" type="number" min="1" max="65535" value="${esc(d.smtpPort)}" /></div>
+    </div>
+    <div class="grid-2" style="margin-top:10px">
+      <div class="field"><label>Username</label><input data-wf="tc-email-field" data-id="smtpUsername" value="${esc(d.smtpUsername)}" /></div>
+      <div class="field"><label>Password ${s.smtpPasswordSet ? '<span class="meta">(set — leave blank to keep)</span>' : ''}</label><input data-wf="tc-email-field" data-id="smtpPassword" type="password" placeholder="${s.smtpPasswordSet ? '••••••••' : ''}" value="${esc(d.smtpPassword)}" /></div>
+    </div>
+    <div class="field" style="margin-top:10px"><label>From address</label><input data-wf="tc-email-field" data-id="smtpFromAddress" placeholder="noreply@example.com" value="${esc(d.smtpFromAddress)}" /></div>
+    <div class="field" style="margin-top:10px"><label><input type="checkbox" data-wf="tc-email-tls" data-id="_" ${d.smtpUseTls ? 'checked' : ''} /> Use TLS</label></div>
+    <div class="actions" style="margin-top:10px">
+      <button class="btn" data-act="tc-email-test" data-id="${id}" ${testing ? 'disabled' : ''}>${testing ? 'Testing…' : 'Test Connection'}</button>
+      <button class="btn" data-act="tc-email-revert" data-id="${id}" ${dirty ? '' : 'disabled'}>Revert</button>
+      <button class="btn btn-primary" data-act="tc-email-save" data-id="${id}" ${dirty && !saving ? '' : 'disabled'}>${saving ? 'Saving…' : 'Save'}</button>
+    </div>`;
+}
+
+function notificationsConfigPanel(state, id, rulesStatus) {
+  if (!rulesStatus || rulesStatus.loading) return `<div class="skel" style="height:60px"></div>`;
+  if (rulesStatus.error) return `<p class="muted">${esc(rulesStatus.error)}</p>`;
+  const rows = rulesStatus.rows || [];
+  const key = (state.tcNotifEventType || 'skill_expiring').trim();
+  const forKey = (channel) => rows.find((r) => r.eventType === key && r.channel === channel);
+  const saving = state.wf.saving?.tcNotif || {};
+  return `
+    <div class="field"><label>Event type</label><input data-wf="tc-notif-key" data-id="_" value="${esc(state.tcNotifEventType || 'skill_expiring')}" placeholder="event type" style="max-width:320px" /></div>
+    <p class="hint" style="margin:6px 0 10px">Only <code>skill_expiring</code> has a real producer in this platform today — the key is free text, same as the tenant's own screen. A user's own preference always overrides this default.</p>
+    <table class="data"><thead><tr><th>Channel</th><th>Default</th><th></th></tr></thead><tbody>
+      ${NOTIF_CHANNELS.map((c) => {
+        const rule = forKey(c);
+        const enabled = rule ? rule.enabled : false;
+        return `<tr>
+          <td class="mono">${c}</td>
+          <td>${rule ? (enabled ? 'Enabled' : 'Disabled') : '<span class="muted">Not set (off)</span>'}</td>
+          <td><button class="btn btn-sm" data-act="tc-notif-toggle" data-id="${c}" ${saving[c] ? 'disabled' : ''}>${saving[c] ? 'Saving…' : enabled ? 'Disable' : 'Enable'}</button></td>
+        </tr>`;
+      }).join('')}
+    </tbody></table>
+    ${rows.length === 0 ? `<p class="hint" style="margin-top:8px">No tenant-wide rules configured yet — a user without their own preference gets nothing until a default is set here.</p>` : ''}`;
+}
+
+function tcSystemLimitsCard(state, id, sl) {
+  if (!sl || sl.loading) return sec('System Limits', `<div class="skel" style="height:40px"></div>`, '');
+  if (sl.error) return sec('System Limits', `<p class="muted">${esc(sl.error)}</p>`, '');
+  const d = state.tcLimitsDraft || { maxUsers: sl.maxUsers, maxEmployees: sl.maxEmployees, maxOrgUnits: sl.maxOrgUnits };
+  const dirty = JSON.stringify(d) !== JSON.stringify({ maxUsers: sl.maxUsers, maxEmployees: sl.maxEmployees, maxOrgUnits: sl.maxOrgUnits });
+  const saving = state.wf.saving?.tcLimits;
+  return sec('System Limits', `
+    <p class="hint" style="margin:0 0 10px">Leave blank for no limit. Enforced on invite/create for users, employees, and organization units respectively; not every user-creation path (SSO/SCIM/platform-admin provisioning) is covered yet.</p>
+    <div class="grid-2">
+      <div class="field"><label>Max users</label><input data-wf="tc-limits-field" data-id="maxUsers" type="number" min="0" value="${esc(d.maxUsers)}" /></div>
+      <div class="field"><label>Max employees</label><input data-wf="tc-limits-field" data-id="maxEmployees" type="number" min="0" value="${esc(d.maxEmployees)}" /></div>
+    </div>
+    <div class="field" style="margin-top:10px;max-width:calc(50% - 6px)"><label>Max organization units</label><input data-wf="tc-limits-field" data-id="maxOrgUnits" type="number" min="0" value="${esc(d.maxOrgUnits)}" /></div>
+    <div class="actions" style="margin-top:10px">
+      <button class="btn" data-act="tc-limits-revert" data-id="${id}" ${dirty ? '' : 'disabled'}>Revert</button>
+      <button class="btn btn-primary" data-act="tc-limits-save" data-id="${id}" ${dirty && !saving ? '' : 'disabled'}>${saving ? 'Saving…' : 'Save'}</button>
+    </div>
+  `);
+}
+
+function tcMaintenanceCard(state, id, mm) {
+  if (!mm || mm.loading) return sec('Maintenance Mode', `<div class="skel" style="height:40px"></div>`, '');
+  if (mm.error) return sec('Maintenance Mode', `<p class="muted">${esc(mm.error)}</p>`, '');
+  const d = state.tcMaintenanceDraft || { enabled: mm.enabled, message: mm.message };
+  const dirty = d.enabled !== mm.enabled || d.message !== mm.message;
+  const saving = state.wf.saving?.tcMaintenance;
+  return sec('Maintenance Mode', `
+    <p class="hint" style="margin:0 0 10px">While enabled, non-GET requests for this tenant are rejected with 503 (platform_admin always bypasses). Toggling this is audited like any other configuration change.</p>
+    <div class="field"><label><input type="checkbox" data-wf="tc-maintenance-toggle" data-id="_" ${d.enabled ? 'checked' : ''} /> This tenant is in maintenance mode</label></div>
+    <div class="field" style="margin-top:10px"><label>Message shown to blocked requests</label><input data-wf="tc-maintenance-field" data-id="message" placeholder="We'll be back shortly." value="${esc(d.message)}" /></div>
+    <div class="actions" style="margin-top:10px">
+      <button class="btn" data-act="tc-maintenance-revert" data-id="${id}" ${dirty ? '' : 'disabled'}>Revert</button>
+      <button class="btn btn-primary" data-act="tc-maintenance-save" data-id="${id}" ${dirty && !saving ? '' : 'disabled'}>${saving ? 'Saving…' : 'Save'}</button>
+    </div>
+  `);
+}
+
+function advancedConfigPanel(state, id, limitsStatus, maintenanceStatus) {
+  return tcSystemLimitsCard(state, id, limitsStatus) + tcMaintenanceCard(state, id, maintenanceStatus);
 }
 
 function dataSourcesPanel(connectorStatus) {
@@ -452,7 +800,7 @@ function tenantDetailDrawer(state) {
     ].join('');
     const saving = state.wf.saving?.createTenant;
     const footer = `<button class="btn btn-primary" data-act="create-tenant-go" ${saving ? 'disabled' : ''}>${saving ? 'Creating…' : 'Create & Provision Tenant'}</button>`;
-    return drawerShell('Create tenant', 'POST /v1/tenants', body, `<button class="btn" data-act="close-drawer">Cancel</button>`, footer);
+    return drawerShell('Create tenant', 'Provision a new tenant and its initial admin user.', body, `<button class="btn" data-act="close-drawer">Cancel</button>`, footer);
   }
   const cache = (state.wf.tenantDetail || {})[id];
   if (!cache || cache.loading) {
@@ -484,17 +832,36 @@ function tenantDetailDrawer(state) {
   const connectorsDone = connectorStatus?.hasConnectors === true;
   const connectorsStatusText = !connectorStatus || connectorStatus.loading ? 'Checking…' : connectorStatus.error ? 'Could not check' : connectorsDone ? 'Configured' : 'None (platform_admin can\'t create one — see panel)';
 
+  const cfgStatus = state.wf.tenantConfigSettings?.[id];
+  const generalStatusText = !cfgStatus || cfgStatus.loading ? 'Checking…' : cfgStatus.error ? 'Could not check' : (cfgStatus.settings?.timezone || 'No timezone set');
+
+  const authPolicyStatus = state.wf.tenantConfigAuthPolicy?.[id];
+  const accessPolicyStatus = state.wf.tenantConfigAccessPolicy?.[id];
+
+  const emailStatusText = !cfgStatus || cfgStatus.loading ? 'Checking…' : cfgStatus.error ? 'Could not check' : cfgStatus.settings?.smtpHost ? `SMTP configured (${cfgStatus.settings.smtpHost})` : 'Not yet configured';
+
+  const notifRulesStatus = state.wf.tenantConfigNotifRules?.[id];
+  const notifStatusText = !notifRulesStatus || notifRulesStatus.loading ? 'Checking…' : notifRulesStatus.error ? 'Could not check' : `${(notifRulesStatus.rows || []).length} tenant-wide rule(s)`;
+
+  const limitsStatus = state.wf.tenantConfigLimitsPolicy?.[id];
+  const maintenanceStatus = state.wf.tenantConfigMaintenancePolicy?.[id];
+  const advancedStatusText = !maintenanceStatus || maintenanceStatus.loading ? 'Checking…' : maintenanceStatus.error ? 'Could not check' : maintenanceStatus.enabled ? 'Maintenance mode ON' : 'Limits & maintenance mode';
+
   const body = [
     accordionPanel(state, 'company', 'Company Information', true, `${t.tier} · ${t.dataResidencyRegion}`, companyPanel(t)),
     accordionPanel(state, 'admin', 'Primary Admin', adminDone, adminStatusText, adminPanel(state, id)),
     accordionPanel(state, 'org', 'Organization', orgDone, orgStatusText, orgPanel(state, id, orgStatus)),
     accordionPanel(state, 'wfm', 'WFM Configuration', wfmDone, wfmStatusText, wfmPanel(state, id, wfmStatus)),
+    accordionPanel(state, 'general', 'General', true, generalStatusText, generalConfigPanel(state, id, cfgStatus), false),
+    accordionPanel(state, 'security', 'Security', securityDone, securityStatusText, securityConfigPanel(state, id, cfgStatus, authPolicyStatus, accessPolicyStatus, healthRow), false),
+    accordionPanel(state, 'email', 'Email', true, emailStatusText, emailConfigPanel(state, id, cfgStatus), false),
+    accordionPanel(state, 'notifications', 'Notifications', true, notifStatusText, notificationsConfigPanel(state, id, notifRulesStatus), false),
+    accordionPanel(state, 'advanced', 'Advanced', true, advancedStatusText, advancedConfigPanel(state, id, limitsStatus, maintenanceStatus), false),
     accordionPanel(state, 'datasources', 'Data Sources', connectorsDone, connectorsStatusText, dataSourcesPanel(connectorStatus)),
-    accordionPanel(state, 'security', 'Security', securityDone, securityStatusText, securityPanel(state, id, healthLoading, healthRow)),
     accordionPanel(state, 'analytics', 'Analytics', true, 'Onboarding funnel & health', analyticsSection(state, id)),
   ].join('');
 
-  return drawerShell(esc(t.name), `GET /v1/tenants/${t.id}`, body, `<button class="btn" data-act="close-drawer">Close</button>`, '');
+  return drawerShell(esc(t.name), 'Tenant details.', body, `<button class="btn" data-act="close-drawer">Close</button>`, '');
 }
 
 export function renderDrawer(state) {
@@ -529,11 +896,26 @@ export function handle(state, act, id, value) {
     state.provisionAdminDraft = emptyProvisionDraft();
     state.orgUnitDraft = emptyOrgUnitDraft();
     state.wfmDraft = emptyWfmDraft();
+    state.tcGeneralDraft = null;
+    state.tcSecurityDraft = null;
+    state.tcAuthPolicyDraft = null;
+    state.tcAccessDraft = null;
+    state.tcEmailDraft = null;
+    state.tcEmailTestResult = null;
+    state.tcNotifEventType = null;
+    state.tcLimitsDraft = null;
+    state.tcMaintenanceDraft = null;
     state.drawer = 'tenant-detail';
     if (!(state.wf.tenantDetail || {})[id]) loadTenantDetail(state, id);
     if (!(state.wf.orgUnitStatus || {})[id]) loadOrgUnitStatus(state, id);
     if (!(state.wf.wfmDefaults || {})[id]) loadWfmDefaults(state, id);
     if (!(state.wf.connectorStatus || {})[id]) loadConnectorStatus(state, id);
+    if (!(state.wf.tenantConfigSettings || {})[id]) loadTenantConfigSettings(state, id);
+    if (!(state.wf.tenantConfigAuthPolicy || {})[id]) loadTenantConfigAuthPolicy(state, id);
+    if (!(state.wf.tenantConfigAccessPolicy || {})[id]) loadTenantConfigAccessPolicy(state, id);
+    if (!(state.wf.tenantConfigNotifRules || {})[id]) loadTenantConfigNotifRules(state, id);
+    if (!(state.wf.tenantConfigLimitsPolicy || {})[id]) loadTenantConfigLimitsPolicy(state, id);
+    if (!(state.wf.tenantConfigMaintenancePolicy || {})[id]) loadTenantConfigMaintenancePolicy(state, id);
     ensureAnalyticsLoaded(state);
     return true;
   }
@@ -708,5 +1090,348 @@ export function handle(state, act, id, value) {
     return true;
   }
 
+  if (act === 'tc-general-field') {
+    state.tcGeneralDraft = state.tcGeneralDraft || emptyTcGeneralDraft(state.wf.tenantConfigSettings[state.tenantDetailId].settings);
+    state.tcGeneralDraft[id] = value;
+    return true;
+  }
+  if (act === 'tc-general-revert') {
+    state.tcGeneralDraft = null;
+    return true;
+  }
+  if (act === 'tc-general-save') {
+    const d = state.tcGeneralDraft;
+    state.wf.saving = state.wf.saving || {};
+    state.wf.saving.tcGeneral = true;
+    doRerender();
+    TenantMonitoringApi.updateTenantConfigGeneral(id, {
+      timezone: (d.timezone || '').trim() || undefined,
+      locale: (d.locale || '').trim() || undefined,
+      brandLogoUrl: (d.brandLogoUrl || '').trim() || null,
+    })
+      .then((updated) => {
+        state.wf.saving.tcGeneral = false;
+        state.wf.tenantConfigSettings[id] = { settings: updated };
+        state.tcGeneralDraft = null;
+        toast('General settings saved.');
+        doRerender();
+      })
+      .catch((err) => {
+        state.wf.saving.tcGeneral = false;
+        toast(errMsg(err));
+        doRerender();
+      });
+    return true;
+  }
+
+  if (act === 'tc-sec-field') {
+    state.tcSecurityDraft = state.tcSecurityDraft || emptyTcSecurityDraft(state.wf.tenantConfigSettings[state.tenantDetailId].settings);
+    state.tcSecurityDraft[id] = id === 'passwordMinLength' ? Number(value) : value;
+    return true;
+  }
+  if (act === 'tc-sec-toggle') {
+    const el = document.querySelector(`[data-wf="tc-sec-toggle"][data-id="${id}"]`);
+    state.tcSecurityDraft = state.tcSecurityDraft || emptyTcSecurityDraft(state.wf.tenantConfigSettings[state.tenantDetailId].settings);
+    state.tcSecurityDraft[id] = !!(el && el.checked);
+    return true;
+  }
+  if (act === 'tc-sec-revert') {
+    state.tcSecurityDraft = null;
+    return true;
+  }
+  if (act === 'tc-sec-save') {
+    const d = state.tcSecurityDraft;
+    const passwordExpiryDays = d.passwordExpiryDays === '' ? null : Number(d.passwordExpiryDays);
+    state.wf.saving = state.wf.saving || {};
+    state.wf.saving.tcSecurity = true;
+    doRerender();
+    TenantMonitoringApi.updateTenantConfigSecurity(id, {
+      passwordMinLength: d.passwordMinLength,
+      passwordRequireUppercase: d.passwordRequireUppercase,
+      passwordRequireNumber: d.passwordRequireNumber,
+      passwordRequireSymbol: d.passwordRequireSymbol,
+      passwordExpiryDays,
+    })
+      .then((updated) => {
+        state.wf.saving.tcSecurity = false;
+        state.wf.tenantConfigSettings[id] = { settings: updated };
+        state.tcSecurityDraft = null;
+        toast('Password policy saved.');
+        doRerender();
+      })
+      .catch((err) => {
+        state.wf.saving.tcSecurity = false;
+        // PLATFORM_SECURITY_BASELINE_VIOLATION carries details.violations —
+        // one specific reason per failed baseline rule (Platform Settings →
+        // Security Baseline) — surface those instead of the generic message.
+        toast(err.details?.violations?.length ? err.details.violations.join(' ') : errMsg(err));
+        doRerender();
+      });
+    return true;
+  }
+
+  if (act === 'tc-authpolicy-toggle') {
+    const ap = state.wf.tenantConfigAuthPolicy[state.tenantDetailId];
+    const scope = value; // 'allowed' | 'required' — the checkbox's own value attribute, see tcAuthMethodCard's doc comment
+    const el = document.querySelector(`[data-wf="tc-authpolicy-toggle"][data-id="${id}"][value="${scope}"]`);
+    state.tcAuthPolicyDraft = state.tcAuthPolicyDraft || { requiredMethods: [...ap.requiredMethods], allowedMethods: [...ap.allowedMethods] };
+    const d = state.tcAuthPolicyDraft;
+    const checked = !!(el && el.checked);
+    const key = scope === 'allowed' ? 'allowedMethods' : 'requiredMethods';
+    d[key] = checked ? [...new Set([...d[key], id])] : d[key].filter((m) => m !== id);
+    if (key === 'allowedMethods' && !checked) {
+      d.requiredMethods = d.requiredMethods.filter((m) => m !== id);
+    }
+    return true;
+  }
+  if (act === 'tc-authpolicy-revert') {
+    state.tcAuthPolicyDraft = null;
+    return true;
+  }
+  if (act === 'tc-authpolicy-save') {
+    const ap = state.wf.tenantConfigAuthPolicy[id];
+    const d = state.tcAuthPolicyDraft;
+    if (d.requiredMethods.some((m) => !d.allowedMethods.includes(m))) {
+      toast('A required method must also be allowed.');
+      return true;
+    }
+    state.wf.saving = state.wf.saving || {};
+    state.wf.saving.tcAuthPolicy = true;
+    doRerender();
+    TenantMonitoringApi.setTenantConfigPolicy(id, 'auth_method_policy', ap.policyGroupId, { requiredMethods: d.requiredMethods, allowedMethods: d.allowedMethods })
+      .then((created) => {
+        state.wf.saving.tcAuthPolicy = false;
+        state.wf.tenantConfigAuthPolicy[id] = { policyGroupId: created.policyGroupId, requiredMethods: d.requiredMethods, allowedMethods: d.allowedMethods };
+        state.tcAuthPolicyDraft = null;
+        toast('Required authentication method saved.');
+        doRerender();
+      })
+      .catch((err) => {
+        state.wf.saving.tcAuthPolicy = false;
+        toast(errMsg(err));
+        doRerender();
+      });
+    return true;
+  }
+
+  if (act === 'tc-access-field') {
+    const ap = state.wf.tenantConfigAccessPolicy[state.tenantDetailId];
+    state.tcAccessDraft = state.tcAccessDraft || { ipAllowlist: ap.ipAllowlist, allowedEmailDomains: ap.allowedEmailDomains };
+    state.tcAccessDraft[id] = value;
+    return true;
+  }
+  if (act === 'tc-access-revert') {
+    state.tcAccessDraft = null;
+    return true;
+  }
+  if (act === 'tc-access-save') {
+    const ap = state.wf.tenantConfigAccessPolicy[id];
+    const d = state.tcAccessDraft;
+    const ipAllowlist = d.ipAllowlist.split('\n').map((s) => s.trim()).filter(Boolean);
+    const allowedEmailDomains = d.allowedEmailDomains.split('\n').map((s) => s.trim()).filter(Boolean);
+    state.wf.saving = state.wf.saving || {};
+    state.wf.saving.tcAccess = true;
+    doRerender();
+    TenantMonitoringApi.setTenantConfigPolicy(id, 'access_restriction_policy', ap.policyGroupId, { ipAllowlist, allowedEmailDomains })
+      .then((created) => {
+        state.wf.saving.tcAccess = false;
+        state.wf.tenantConfigAccessPolicy[id] = { policyGroupId: created.policyGroupId, ipAllowlist: ipAllowlist.join('\n'), allowedEmailDomains: allowedEmailDomains.join('\n') };
+        state.tcAccessDraft = null;
+        toast('Access restrictions saved.');
+        doRerender();
+      })
+      .catch((err) => {
+        state.wf.saving.tcAccess = false;
+        toast(errMsg(err));
+        doRerender();
+      });
+    return true;
+  }
+
+  if (act === 'tc-email-field') {
+    state.tcEmailDraft = state.tcEmailDraft || emptyTcEmailDraft(state.wf.tenantConfigSettings[state.tenantDetailId].settings);
+    state.tcEmailDraft[id] = value;
+    return true;
+  }
+  if (act === 'tc-email-tls') {
+    const el = document.querySelector('[data-wf="tc-email-tls"]');
+    state.tcEmailDraft = state.tcEmailDraft || emptyTcEmailDraft(state.wf.tenantConfigSettings[state.tenantDetailId].settings);
+    state.tcEmailDraft.smtpUseTls = !!(el && el.checked);
+    return true;
+  }
+  if (act === 'tc-email-revert') {
+    state.tcEmailDraft = null;
+    return true;
+  }
+  if (act === 'tc-email-test') {
+    state.wf.saving = state.wf.saving || {};
+    state.wf.saving.tcEmailTest = true;
+    state.tcEmailTestResult = null;
+    doRerender();
+    TenantMonitoringApi.testTenantConfigEmail(id)
+      .then((result) => {
+        state.wf.saving.tcEmailTest = false;
+        state.tcEmailTestResult = result;
+        doRerender();
+      })
+      .catch((err) => {
+        state.wf.saving.tcEmailTest = false;
+        toast(errMsg(err));
+        doRerender();
+      });
+    return true;
+  }
+  if (act === 'tc-email-save') {
+    const d = state.tcEmailDraft;
+    state.wf.saving = state.wf.saving || {};
+    state.wf.saving.tcEmail = true;
+    doRerender();
+    TenantMonitoringApi.updateTenantConfigEmail(id, {
+      smtpHost: (d.smtpHost || '').trim() || null,
+      smtpPort: d.smtpPort === '' ? null : Number(d.smtpPort),
+      smtpUsername: (d.smtpUsername || '').trim() || null,
+      smtpPassword: (d.smtpPassword || '').trim() || undefined,
+      smtpFromAddress: (d.smtpFromAddress || '').trim() || null,
+      smtpUseTls: d.smtpUseTls,
+    })
+      .then((updated) => {
+        state.wf.saving.tcEmail = false;
+        state.wf.tenantConfigSettings[id] = { settings: updated };
+        state.tcEmailDraft = null;
+        toast('Email settings saved.');
+        doRerender();
+      })
+      .catch((err) => {
+        state.wf.saving.tcEmail = false;
+        toast(errMsg(err));
+        doRerender();
+      });
+    return true;
+  }
+
+  if (act === 'tc-notif-key') {
+    state.tcNotifEventType = value;
+    return true;
+  }
+  if (act === 'tc-notif-toggle') {
+    const tenantId = state.tenantDetailId;
+    const key = (state.tcNotifEventType || 'skill_expiring').trim();
+    const rows = (state.wf.tenantConfigNotifRules?.[tenantId]?.rows) || [];
+    const rule = rows.find((r) => r.eventType === key && r.channel === id);
+    const nextEnabled = !(rule ? rule.enabled : false);
+    state.wf.saving = state.wf.saving || {};
+    state.wf.saving.tcNotif = state.wf.saving.tcNotif || {};
+    state.wf.saving.tcNotif[id] = true;
+    doRerender();
+    TenantMonitoringApi.setTenantConfigNotificationRule(tenantId, key, id, nextEnabled)
+      .then(() => {
+        state.wf.saving.tcNotif[id] = false;
+        toast('Notification rule saved.');
+        doRerender();
+        loadTenantConfigNotifRules(state, tenantId);
+      })
+      .catch((err) => {
+        state.wf.saving.tcNotif[id] = false;
+        toast(errMsg(err));
+        doRerender();
+      });
+    return true;
+  }
+
+  if (act === 'tc-limits-field') {
+    const sl = state.wf.tenantConfigLimitsPolicy[state.tenantDetailId];
+    state.tcLimitsDraft = state.tcLimitsDraft || { maxUsers: sl.maxUsers, maxEmployees: sl.maxEmployees, maxOrgUnits: sl.maxOrgUnits };
+    state.tcLimitsDraft[id] = value;
+    return true;
+  }
+  if (act === 'tc-limits-revert') {
+    state.tcLimitsDraft = null;
+    return true;
+  }
+  if (act === 'tc-limits-save') {
+    const sl = state.wf.tenantConfigLimitsPolicy[id];
+    const d = state.tcLimitsDraft;
+    const toNum = (s) => (s === '' ? undefined : Number(s));
+    state.wf.saving = state.wf.saving || {};
+    state.wf.saving.tcLimits = true;
+    doRerender();
+    TenantMonitoringApi.setTenantConfigPolicy(id, 'system_limits', sl.policyGroupId, { maxUsers: toNum(d.maxUsers), maxEmployees: toNum(d.maxEmployees), maxOrgUnits: toNum(d.maxOrgUnits) })
+      .then((created) => {
+        state.wf.saving.tcLimits = false;
+        state.wf.tenantConfigLimitsPolicy[id] = { policyGroupId: created.policyGroupId, ...d };
+        state.tcLimitsDraft = null;
+        toast('System limits saved.');
+        doRerender();
+      })
+      .catch((err) => {
+        state.wf.saving.tcLimits = false;
+        toast(errMsg(err));
+        doRerender();
+      });
+    return true;
+  }
+
+  if (act === 'tc-maintenance-toggle') {
+    const mm = state.wf.tenantConfigMaintenancePolicy[state.tenantDetailId];
+    const el = document.querySelector('[data-wf="tc-maintenance-toggle"]');
+    state.tcMaintenanceDraft = state.tcMaintenanceDraft || { enabled: mm.enabled, message: mm.message };
+    state.tcMaintenanceDraft.enabled = !!(el && el.checked);
+    return true;
+  }
+  if (act === 'tc-maintenance-field') {
+    const mm = state.wf.tenantConfigMaintenancePolicy[state.tenantDetailId];
+    state.tcMaintenanceDraft = state.tcMaintenanceDraft || { enabled: mm.enabled, message: mm.message };
+    state.tcMaintenanceDraft[id] = value;
+    return true;
+  }
+  if (act === 'tc-maintenance-revert') {
+    state.tcMaintenanceDraft = null;
+    return true;
+  }
+  if (act === 'tc-maintenance-save') {
+    const mm = state.wf.tenantConfigMaintenancePolicy[id];
+    const d = state.tcMaintenanceDraft;
+    state.wf.saving = state.wf.saving || {};
+    state.wf.saving.tcMaintenance = true;
+    doRerender();
+    TenantMonitoringApi.setTenantConfigPolicy(id, 'maintenance_mode', mm.policyGroupId, { enabled: d.enabled, message: d.message || undefined })
+      .then((created) => {
+        state.wf.saving.tcMaintenance = false;
+        state.wf.tenantConfigMaintenancePolicy[id] = { policyGroupId: created.policyGroupId, enabled: d.enabled, message: d.message };
+        state.tcMaintenanceDraft = null;
+        toast(d.enabled ? 'Maintenance mode enabled.' : 'Maintenance mode disabled.');
+        doRerender();
+      })
+      .catch((err) => {
+        state.wf.saving.tcMaintenance = false;
+        toast(errMsg(err));
+        doRerender();
+      });
+    return true;
+  }
+
   return false;
 }
+
+/* Reused by ../system-config/system-config.js — the standalone, top-level
+   Platform > System Configuration screen is a second entry point onto these
+   same cross-tenant panels/loaders (pick-a-tenant instead of open-a-drawer),
+   not a fork of them. Both screens key off the same state.tenantDetailId
+   plus the state.wf.tenantConfig-prefixed caches and state.tc-prefixed
+   drafts, so editing General/Security/Email/Notifications/Advanced from
+   either place stays in sync with the other automatically. */
+export {
+  loadAllTenants,
+  healthRowFor,
+  loadTenantConfigSettings,
+  loadTenantConfigAuthPolicy,
+  loadTenantConfigAccessPolicy,
+  loadTenantConfigNotifRules,
+  loadTenantConfigLimitsPolicy,
+  loadTenantConfigMaintenancePolicy,
+  generalConfigPanel,
+  securityConfigPanel,
+  emailConfigPanel,
+  notificationsConfigPanel,
+  advancedConfigPanel,
+};

@@ -12,6 +12,7 @@ import { EmployeeModule } from '../employee/employee.module';
 import { OrgUnitModule } from '../org-unit/org-unit.module';
 import { AuthModule } from '../auth/auth.module';
 import { AuditModule } from '../audit/audit.module';
+import { PlatformSettingsModule } from '../platform-settings/platform-settings.module';
 
 /**
  * Imports `EmployeeModule` (writes) and `OrgUnitModule` (validation) - both
@@ -22,6 +23,12 @@ import { AuditModule } from '../audit/audit.module';
  * `AuditModule` added for GAP-06 (enterprise readiness audit, 2026-08-18):
  * `BulkImportService` now injects `AuditLogRepository` directly - no cycle
  * risk, same as every other module's own addition.
+ *
+ * Platform Settings gap-fix: `PlatformSettingsModule` added for
+ * `FeatureFlagsService`'s new platform-wide-default fallback. Harmless
+ * diamond with the `AuthModule -> TenantSettingsModule -> PlatformSettingsModule`
+ * path above (both converge on the same leaf module) - not a cycle, since
+ * `PlatformSettingsModule` doesn't import this module back.
  */
 @Module({
   imports: [
@@ -30,6 +37,7 @@ import { AuditModule } from '../audit/audit.module';
     OrgUnitModule,
     AuthModule,
     AuditModule,
+    PlatformSettingsModule,
   ],
   providers: [
     BulkImportJobsRepository,

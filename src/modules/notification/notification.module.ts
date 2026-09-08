@@ -20,6 +20,8 @@ import { UsersRepository } from '../identity/repositories/users.repository';
 import { AuthModule } from '../auth/auth.module';
 import { AuditModule } from '../audit/audit.module';
 import { NotificationRulesController } from './rest/notification-rules.controller';
+import { PlatformSettingsModule } from '../platform-settings/platform-settings.module';
+import { PlatformSettingsRepository } from '../platform-settings/repositories/platform-settings.repository';
 
 /**
  * GAP-05 fix (enterprise readiness audit, 2026-08-18): this module used to
@@ -42,6 +44,7 @@ import { NotificationRulesController } from './rest/notification-rules.controlle
     IdentityModule,
     AuthModule,
     AuditModule,
+    PlatformSettingsModule,
   ],
   providers: [
     NotificationPreferencesRepository,
@@ -51,13 +54,18 @@ import { NotificationRulesController } from './rest/notification-rules.controlle
     NotificationDeliveryDispatcherService,
     {
       provide: NOTIFICATION_CHANNEL_ADAPTERS,
-      useFactory: (tenantContext: TenantContextService, tenantSettingsRepository: TenantSettingsRepository, usersRepository: UsersRepository) =>
+      useFactory: (
+        tenantContext: TenantContextService,
+        tenantSettingsRepository: TenantSettingsRepository,
+        usersRepository: UsersRepository,
+        platformSettingsRepository: PlatformSettingsRepository,
+      ) =>
         Object.values(NotificationChannel).map((channel) =>
           channel === NotificationChannel.EMAIL
-            ? new SmtpChannelAdapter(tenantContext, tenantSettingsRepository, usersRepository)
+            ? new SmtpChannelAdapter(tenantContext, tenantSettingsRepository, usersRepository, platformSettingsRepository)
             : new LoggingChannelAdapter(channel),
         ),
-      inject: [TenantContextService, TenantSettingsRepository, UsersRepository],
+      inject: [TenantContextService, TenantSettingsRepository, UsersRepository, PlatformSettingsRepository],
     },
   ],
   controllers: [NotificationRulesController],

@@ -8,10 +8,14 @@ import { UpdateGeneralSettingsDto } from './dto/update-general-settings.dto';
 import { UpdateSelfIdentificationSettingsDto } from './dto/update-self-identification-settings.dto';
 import { UpdateWfmDefaultsDto } from './dto/update-wfm-defaults.dto';
 import { UpdateWorkforceDefaultsDto } from './dto/update-workforce-defaults.dto';
+import { PlatformSecurityBaselineService } from '../platform-settings/services/platform-security-baseline.service';
 
 @Injectable()
 export class TenantSettingsService {
-  constructor(private readonly repository: TenantSettingsRepository) {}
+  constructor(
+    private readonly repository: TenantSettingsRepository,
+    private readonly platformSecurityBaseline: PlatformSecurityBaselineService,
+  ) {}
 
   async getSettings(): Promise<TenantSettingsView> {
     return toTenantSettingsView(await this.repository.getOrCreate());
@@ -30,8 +34,19 @@ export class TenantSettingsService {
     return toTenantSettingsView(saved);
   }
 
+  /**
+   * Platform Settings gap-fix: `assertWithinBaseline` throws
+   * `PlatformSecurityBaselineViolationError` (409) if this write would leave
+   * the tenant below the platform-wide security baseline — checked BEFORE
+   * `Object.assign`, using the current row as the "value unless this dto
+   * overrides it" baseline, matching this method's own partial-update
+   * semantics. Covers both this self-service route and the platform_admin
+   * cross-tenant route (`TenantConfigAdminController.updateSecurity`), since
+   * both call this exact method.
+   */
   async updateSecurityPolicy(dto: UpdateSecurityPolicyDto): Promise<TenantSettingsView> {
     const current = await this.repository.getOrCreate();
+    await this.platformSecurityBaseline.assertWithinBaseline(dto, current);
     Object.assign(current, dto);
     const saved = await this.repository.save(current);
     return toTenantSettingsView(saved);

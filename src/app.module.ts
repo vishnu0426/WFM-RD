@@ -41,6 +41,7 @@ import { CoreEventingModule } from './modules/core-eventing/core-eventing.module
 import { BulkImportModule } from './modules/bulk-import/bulk-import.module';
 import { TenantApiModule } from './modules/tenant-api.module';
 import { TenantSettingsApiModule } from './modules/tenant-settings-api.module';
+import { PlatformSettingsApiModule } from './modules/platform-settings-api.module';
 import { WebhookApiModule } from './modules/webhook-api.module';
 import { PlatformGraphQLModule } from './modules/platform-graphql.module';
 import { HealthModule } from './common/health/health.module';
@@ -137,6 +138,7 @@ function formatGraphQLError(formattedError: GraphQLFormattedError, error: unknow
     BulkImportModule,
     TenantApiModule,
     TenantSettingsApiModule,
+    PlatformSettingsApiModule,
     WebhookApiModule,
     PlatformGraphQLModule,
     HealthModule,

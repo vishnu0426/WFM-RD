@@ -6,8 +6,11 @@ import { IdentityModule } from './identity/identity.module';
 import { OrgUnitModule } from './org-unit/org-unit.module';
 import { TenantSettingsModule } from './tenant-settings/tenant-settings.module';
 import { BulkImportModule } from './bulk-import/bulk-import.module';
+import { PolicyModule } from './policy/policy.module';
+import { NotificationModule } from './notification/notification.module';
 import { TenantManagementController } from './tenant/rest/tenant-management.controller';
 import { FeatureFlagAdminController } from './tenant/rest/feature-flag-admin.controller';
+import { TenantConfigAdminController } from './tenant/rest/tenant-config-admin.controller';
 
 /**
  * Phase 6's composition root for `/v1/tenants` (§3.2), mirroring
@@ -39,9 +42,25 @@ import { FeatureFlagAdminController } from './tenant/rest/feature-flag-admin.con
  * `FeatureFlagsService`) - `BulkImportModule` imports `OrgUnitModule`
  * itself too (already imported here directly), a harmless diamond, not a
  * cycle - it doesn't import `TenantApiModule`.
+ *
+ * Platform Admin cross-tenant System Configuration gap-fix: also imports
+ * `PolicyModule` (for `TenantConfigAdminController`'s `PoliciesRepository`)
+ * and `NotificationModule` (for its `NotificationRulesRepository`) - both
+ * are leaves relative to this module (neither imports `TenantApiModule`),
+ * so no cycle risk, same shape as every other import here.
  */
 @Module({
-  imports: [TenantModule, AuthModule, AuditModule, IdentityModule, OrgUnitModule, TenantSettingsModule, BulkImportModule],
-  controllers: [TenantManagementController, FeatureFlagAdminController],
+  imports: [
+    TenantModule,
+    AuthModule,
+    AuditModule,
+    IdentityModule,
+    OrgUnitModule,
+    TenantSettingsModule,
+    BulkImportModule,
+    PolicyModule,
+    NotificationModule,
+  ],
+  controllers: [TenantManagementController, FeatureFlagAdminController, TenantConfigAdminController],
 })
 export class TenantApiModule {}

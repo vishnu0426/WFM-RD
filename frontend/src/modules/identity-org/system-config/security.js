@@ -87,7 +87,7 @@ function passwordPolicyCard(state) {
       <button class="btn" data-wf="sc-sec-revert" ${dirty ? '' : 'disabled'}>Revert</button>
       <button class="btn btn-primary" data-wf="sc-sec-save" ${dirty && !saving ? '' : 'disabled'}>${saving ? 'Saving…' : 'Save'}</button>
     </div>
-  `, `<span class="meta">PUT /v1/tenant-settings/security</span>`);
+  `);
 }
 
 function authMethodCard(state) {
@@ -110,7 +110,7 @@ function authMethodCard(state) {
       <button class="btn" data-wf="sc-authpolicy-revert" ${dirty ? '' : 'disabled'}>Revert</button>
       <button class="btn btn-primary" data-wf="sc-authpolicy-save" ${dirty && !saving ? '' : 'disabled'}>${saving ? 'Saving…' : 'Save'}</button>
     </div>
-  `, `<span class="meta">POST /v1/policies (policyType=auth_method_policy)</span>`);
+  `);
 }
 
 function accessRestrictionCard(state) {
@@ -130,7 +130,7 @@ function accessRestrictionCard(state) {
       <button class="btn" data-wf="sc-access-revert" ${dirty ? '' : 'disabled'}>Revert</button>
       <button class="btn btn-primary" data-wf="sc-access-save" ${dirty && !saving ? '' : 'disabled'}>${saving ? 'Saving…' : 'Save'}</button>
     </div>
-  `, `<span class="meta">POST /v1/policies (policyType=access_restriction_policy)</span>`);
+  `);
 }
 
 export function render(state) {
@@ -188,7 +188,11 @@ export function handle(state, act, id, value) {
       })
       .catch((err) => {
         state.wf.saving.scSecurity = false;
-        toast(errMsg(err));
+        // PLATFORM_SECURITY_BASELINE_VIOLATION carries details.violations —
+        // one specific reason per failed baseline rule (set by platform_admin
+        // under Platform Settings → Security Baseline) — surface those
+        // instead of the generic message.
+        toast(err.details?.violations?.length ? err.details.violations.join(' ') : errMsg(err));
         doRerender();
       });
     return true;

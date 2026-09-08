@@ -44,9 +44,14 @@ describe('TenantSettingsService', () => {
       getOrCreate: jest.fn(),
       save: jest.fn(),
     },
+    // No baseline configured (assertWithinBaseline no-ops) unless a test overrides this.
+    platformSecurityBaseline: {
+      assertWithinBaseline: jest.fn().mockResolvedValue(undefined),
+    },
   });
 
-  const makeService = (deps: ReturnType<typeof makeDeps>) => new TenantSettingsService(deps.repository as never);
+  const makeService = (deps: ReturnType<typeof makeDeps>) =>
+    new TenantSettingsService(deps.repository as never, deps.platformSecurityBaseline as never);
 
   it('getSettings never exposes smtpPassword, only a boolean flag', async () => {
     const deps = makeDeps();

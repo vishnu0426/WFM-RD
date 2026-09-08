@@ -62,6 +62,8 @@ const STATUS_BY_CODE: Record<string, HttpStatus> = {
   WEAK_PASSWORD: HttpStatus.BAD_REQUEST,
   // System Configuration gap-fix: System Limits (SystemLimitsPolicyService).
   SYSTEM_LIMIT_EXCEEDED: HttpStatus.CONFLICT,
+  // Platform Settings gap-fix: PlatformSecurityBaselineService.
+  PLATFORM_SECURITY_BASELINE_VIOLATION: HttpStatus.CONFLICT,
 };
 
 @Catch(DomainError)

@@ -66,3 +66,76 @@ export function setFeatureFlagForTenant(flagKey, tenantId, enabled) {
     body: { enabled },
   });
 }
+
+/* Platform Admin's cross-tenant System Configuration
+   (TenantConfigAdminController, src/modules/tenant/rest/tenant-config-admin.controller.ts)
+   — same underlying TenantSettings/Policy/NotificationRule rows the
+   tenant's own /v1/tenant-settings self-service routes read/write, just
+   reached via a platform_admin-gated :id-scoped sibling. */
+export function getTenantConfigGeneral(id) {
+  return Api.rootApi(`/v1/tenants/${id}/config/general`);
+}
+export function updateTenantConfigGeneral(id, dto) {
+  return Api.rootApi(`/v1/tenants/${id}/config/general`, { method: 'PUT', body: dto });
+}
+export function getTenantConfigSecurity(id) {
+  return Api.rootApi(`/v1/tenants/${id}/config/security`);
+}
+export function updateTenantConfigSecurity(id, dto) {
+  return Api.rootApi(`/v1/tenants/${id}/config/security`, { method: 'PUT', body: dto });
+}
+export function getTenantConfigEmail(id) {
+  return Api.rootApi(`/v1/tenants/${id}/config/email`);
+}
+export function updateTenantConfigEmail(id, dto) {
+  return Api.rootApi(`/v1/tenants/${id}/config/email`, { method: 'PUT', body: dto });
+}
+export function testTenantConfigEmail(id) {
+  return Api.rootApi(`/v1/tenants/${id}/config/email/test-connection`, { method: 'POST' });
+}
+export function getTenantConfigPolicy(id, policyType) {
+  return Api.rootApi(`/v1/tenants/${id}/config/${policyType}`);
+}
+export function setTenantConfigPolicy(id, policyType, policyGroupId, definition) {
+  return Api.rootApi(`/v1/tenants/${id}/config/${policyType}`, {
+    method: 'POST',
+    body: { policyGroupId: policyGroupId || undefined, definition },
+  });
+}
+export function listTenantConfigNotificationRules(id) {
+  return Api.rootApi(`/v1/tenants/${id}/config/notification-rules`);
+}
+export function setTenantConfigNotificationRule(id, eventType, channel, enabled) {
+  return Api.rootApi(`/v1/tenants/${id}/config/notification-rules/${encodeURIComponent(eventType)}/${channel}`, {
+    method: 'PUT',
+    body: { enabled },
+  });
+}
+
+/* Platform Settings (PlatformSettingsController, src/modules/platform-settings/
+   rest/platform-settings.controller.ts) — genuinely platform-wide, no
+   tenant in the URL at all, unlike everything above this comment. */
+export function getPlatformFeatureFlagDefaults() {
+  return Api.rootApi('/v1/platform-settings/feature-flag-defaults');
+}
+export function setPlatformFeatureFlagDefault(flagKey, enabled) {
+  return Api.rootApi(`/v1/platform-settings/feature-flag-defaults/${encodeURIComponent(flagKey)}`, {
+    method: 'PUT',
+    body: { enabled },
+  });
+}
+export function getPlatformSmtpSettings() {
+  return Api.rootApi('/v1/platform-settings/smtp');
+}
+export function updatePlatformSmtpSettings(dto) {
+  return Api.rootApi('/v1/platform-settings/smtp', { method: 'PUT', body: dto });
+}
+export function testPlatformSmtpConnection() {
+  return Api.rootApi('/v1/platform-settings/smtp/test-connection', { method: 'POST' });
+}
+export function getPlatformSecurityBaseline() {
+  return Api.rootApi('/v1/platform-settings/security-baseline');
+}
+export function updatePlatformSecurityBaseline(dto) {
+  return Api.rootApi('/v1/platform-settings/security-baseline', { method: 'PUT', body: dto });
+}

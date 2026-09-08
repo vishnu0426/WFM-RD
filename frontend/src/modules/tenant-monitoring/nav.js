@@ -4,7 +4,14 @@
    shape as every other module (forecasting-scheduling/nav.js is the
    template). "All Tenants" (list/create/provision-admin) is first — the
    natural landing screen; Onboarding Funnel/Tenant Health are the
-   read-only analytics views. */
+   read-only analytics views.
+
+   Each top-level key here is its own entry in the left rail
+   (app/platform-admin-shell.js's shell() renders Object.keys(NAV) as
+   .nav-item buttons directly, one click, no drill-down) — NOT a tab nested
+   under another group. System Configuration is its own top-level entry for
+   exactly that reason: it needs to be a one-click destination, not a tab a
+   platform_admin has to first open Platform to discover. */
 
 export const NAV = {
   Tenants: [
@@ -14,6 +21,11 @@ export const NAV = {
   ],
   // Cross-cutting, not tied to any one tenant's onboarding — its own group.
   Platform: [{ id: 'tm-feature-flags', label: 'Feature Flags', live: true }],
+  'System Configuration': [{ id: 'tm-system-config', label: 'System Configuration', live: true }],
+  // Genuinely platform-wide (no tenant picker) — distinct from System
+  // Configuration above, which is per-tenant.
+  'Platform Settings': [{ id: 'tm-platform-settings', label: 'Platform Settings', live: true }],
+  'Application Monitoring': [{ id: 'tm-app-monitoring', label: 'Application Monitoring', live: true }],
 };
 
 export const FIRST = Object.fromEntries(Object.entries(NAV).map(([g, tabs]) => [g, tabs[0].id]));
